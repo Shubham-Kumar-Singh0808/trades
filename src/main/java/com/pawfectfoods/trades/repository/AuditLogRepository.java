@@ -1,0 +1,8 @@
+package com.pawfectfoods.trades.repository;
+
+import com.pawfectfoods.trades.model.AuditLog;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
+}
