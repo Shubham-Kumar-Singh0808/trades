@@ -4,6 +4,10 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -27,6 +31,7 @@ export default function TradesPage() {
   const [vendors, setVendors] = useState([]);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
     tradeId: '',
     mode: 'ONLINE',
@@ -80,6 +85,7 @@ export default function TradesPage() {
 
       await api.post('/api/trades', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setForm({ tradeId: '', mode: 'ONLINE', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], file: null });
+      setCreateModalOpen(false);
       loadTrades(1);
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to create trade');
@@ -93,8 +99,52 @@ export default function TradesPage() {
 
       <Card>
         <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Create Trade</Typography>
-          <Stack component="form" spacing={2} onSubmit={createTrade}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">Trade List</Typography>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)}>Create Trade</Button>
+          </Stack>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Trade ID</TableCell>
+                <TableCell>Mode</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Created By</TableCell>
+                <TableCell>Details</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data?.content?.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell>{t.tradeId}</TableCell>
+                  <TableCell>{t.mode}</TableCell>
+                  <TableCell>{t.description}</TableCell>
+                  <TableCell>{t.createdBy}</TableCell>
+                  <TableCell>
+                    <Button component={Link} to={`/trades/${t.id}`} size="small">Open</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {!!data && (
+            <Pagination
+              sx={{ mt: 2 }}
+              count={Math.max(data.totalPages || 1, 1)}
+              page={page}
+              onChange={(_, value) => {
+                setPage(value);
+                loadTrades(value);
+              }}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={createModalOpen} onClose={() => setCreateModalOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Create Trade</DialogTitle>
+        <DialogContent>
+          <Stack component="form" spacing={2} sx={{ mt: 1 }} onSubmit={createTrade}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <TextField label="Trade ID" value={form.tradeId} onChange={(e) => setForm((p) => ({ ...p, tradeId: e.target.value }))} fullWidth />
               <FormControl fullWidth>
@@ -157,51 +207,13 @@ export default function TradesPage() {
                 {form.file ? form.file.name : 'No file selected'}
               </Typography>
             </Box>
-            <Button type="submit" variant="contained">Create Trade</Button>
           </Stack>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Trade List</Typography>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Trade ID</TableCell>
-                <TableCell>Mode</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Created By</TableCell>
-                <TableCell>Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {data?.content?.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell>{t.tradeId}</TableCell>
-                  <TableCell>{t.mode}</TableCell>
-                  <TableCell>{t.description}</TableCell>
-                  <TableCell>{t.createdBy}</TableCell>
-                  <TableCell>
-                    <Button component={Link} to={`/trades/${t.id}`} size="small">Open</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {!!data && (
-            <Pagination
-              sx={{ mt: 2 }}
-              count={Math.max(data.totalPages || 1, 1)}
-              page={page}
-              onChange={(_, value) => {
-                setPage(value);
-                loadTrades(value);
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
+          <Button onClick={createTrade} variant="contained">Create Trade</Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

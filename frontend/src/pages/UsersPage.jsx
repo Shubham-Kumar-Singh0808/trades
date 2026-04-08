@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -8,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Pagination,
@@ -19,8 +21,10 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { Edit as EditIcon, Delete as DeleteIcon, Visibility as VisibilityIcon, VisibilityOff as VisibilityOffIcon } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 
@@ -29,6 +33,7 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
     role: 'VENDOR',
     name: '',
@@ -122,81 +127,65 @@ export default function UsersPage() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} sx={{ width: '100%' }}>
       <Typography variant="h5">Users</Typography>
       {error && <Alert severity="error">{error}</Alert>}
       {success && <Alert severity="success">{success}</Alert>}
 
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Create User</Typography>
-          <Stack component="form" onSubmit={createUser} spacing={2}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <FormControl fullWidth>
-                <InputLabel>Role</InputLabel>
-                <Select
-                  value={form.role}
-                  label="Role"
-                  onChange={(e) => setForm((p) => ({ ...p, role: e.target.value, companyName: e.target.value === 'VENDOR' ? p.companyName : '' }))}
-                >
-                  <MenuItem value="VENDOR">VENDOR</MenuItem>
-                  <MenuItem value="EXECUTIVE">EXECUTIVE</MenuItem>
-                  <MenuItem value="ADMIN">ADMIN</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField label="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} fullWidth />
-              <TextField label="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} fullWidth />
-            </Stack>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <TextField label="Phone" value={form.mobileNo} onChange={(e) => setForm((p) => ({ ...p, mobileNo: e.target.value }))} fullWidth />
-              {form.role === 'VENDOR' && (
-                <TextField label="Company Name" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} fullWidth />
-              )}
-            </Stack>
-            <Button type="submit" variant="contained">Create</Button>
+      <Card sx={{ width: '100%' }}>
+        <CardContent sx={{ width: '100%', p: { xs: 2, sm: 3 }, overflow: 'hidden' }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 2, gap: 1 }}>
+            <Typography variant="h6">User List</Typography>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)}>Add User</Button>
           </Stack>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>User List</Typography>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Email</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Phone</TableCell>
-                <TableCell>Company</TableCell>
-                <TableCell>Enabled</TableCell>
-                <TableCell>Verified</TableCell>
-                <TableCell>Roles</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {data?.content?.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>{u.name}</TableCell>
-                  <TableCell>{u.mobileNo}</TableCell>
-                  <TableCell>{u.companyName}</TableCell>
-                  <TableCell>{String(u.enabled)}</TableCell>
-                  <TableCell>{String(u.emailVerified)}</TableCell>
-                  <TableCell>{u.roles?.join(', ')}</TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1}>
-                      <Button size="small" variant="outlined" onClick={() => setEditingUser({ ...u, role: roleFromUser(u) })}>Edit</Button>
-                      <Button size="small" variant="outlined" color={u.enabled ? 'warning' : 'success'} onClick={() => toggleStatus(u)}>
-                        {u.enabled ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button size="small" variant="outlined" color="error" onClick={() => removeUser(u)}>Delete</Button>
-                    </Stack>
-                  </TableCell>
+          <Box sx={{ overflowX: 'auto', overflowY: 'hidden', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+            <Table size="small" sx={{ width: '100%', minWidth: 600 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Email</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Name</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Phone</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Company</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Enabled</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Verified</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Roles</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {data?.content?.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{u.email}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{u.name}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{u.mobileNo}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{u.companyName}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{String(u.enabled)}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{String(u.emailVerified)}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{u.roles?.join(', ')}</TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => setEditingUser({ ...u, role: roleFromUser(u) })} color="primary">
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={u.enabled ? 'Disable' : 'Enable'}>
+                          <IconButton size="small" onClick={() => toggleStatus(u)} color={u.enabled ? 'warning' : 'success'}>
+                            {u.enabled ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => removeUser(u)} color="error">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
           {!!data && (
             <Pagination
               sx={{ mt: 2 }}
@@ -240,6 +229,36 @@ export default function UsersPage() {
         <DialogActions>
           <Button onClick={() => setEditingUser(null)}>Cancel</Button>
           <Button onClick={saveEdit} variant="contained">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={createModalOpen} onClose={() => setCreateModalOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Create User</DialogTitle>
+        <DialogContent>
+          <Stack component="form" onSubmit={(e) => { createUser(e); setCreateModalOpen(false); }} spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Role</InputLabel>
+              <Select
+                value={form.role}
+                label="Role"
+                onChange={(e) => setForm((p) => ({ ...p, role: e.target.value, companyName: e.target.value === 'VENDOR' ? p.companyName : '' }))}
+              >
+                <MenuItem value="VENDOR">VENDOR</MenuItem>
+                <MenuItem value="EXECUTIVE">EXECUTIVE</MenuItem>
+                <MenuItem value="ADMIN">ADMIN</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField label="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} fullWidth />
+            <TextField label="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} fullWidth />
+            <TextField label="Phone" value={form.mobileNo} onChange={(e) => setForm((p) => ({ ...p, mobileNo: e.target.value }))} fullWidth />
+            {form.role === 'VENDOR' && (
+              <TextField label="Company Name" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} fullWidth />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
+          <Button onClick={(e) => { createUser(e); setCreateModalOpen(false); }} variant="contained">Create</Button>
         </DialogActions>
       </Dialog>
     </Stack>

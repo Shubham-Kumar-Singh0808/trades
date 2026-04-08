@@ -1,7 +1,8 @@
-import { Alert, Box, Button, Card, CardContent, Snackbar, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Snackbar, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import logo from '../assets/images/logo.png';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [form, setForm] = useState({ email: 'admin@pawfectfoods.com', password: 'admin@pawfectfoods' });
@@ -44,44 +45,91 @@ export default function LoginPage({ onLoginSuccess }) {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'radial-gradient(circle at 10% 20%, #d7f6f0 0%, #f8f5eb 100%)' }}>
-      <Card sx={{ width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.12)' }}>
-        <CardContent>
-          <Typography variant="h4" gutterBottom>
+    <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 0 }, maxWidth: 900, width: '100%', background: 'white', borderRadius: { xs: '16px', md: '24px' }, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)' }}>
+        {/* Left Side - Welcome Section */}
+        <Box sx={{ background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', p: { xs: 3, md: 4 }, position: 'relative', overflow: 'hidden', display: { xs: 'none', md: 'flex' } }}>
+          {/* Decorative Wave */}
+          <Box sx={{ position: 'absolute', bottom: 0, right: -50, width: 300, height: 300, background: 'rgba(255, 255, 255, 0.1)', borderRadius: '50%' }} />
+          <Box sx={{ position: 'absolute', top: -100, right: -100, width: 250, height: 250, background: 'rgba(255, 255, 255, 0.05)', borderRadius: '50%' }} />
+          
+          <Box sx={{ textAlign: 'center', zIndex: 1 }}>
+            <Box component="img" src={logo} alt="Logo" sx={{ height: 80, mb: 3 }} />
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
+              Welcome Back!
+            </Typography>
+            <Typography variant="body1" sx={{ opacity: 0.9, lineHeight: 1.6 }}>
+              Login to your account to continue managing your trades and vendors
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Right Side - Login Form */}
+        <Box sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'center', mb: 2 }}>
+            <Box component="img" src={logo} alt="Logo" sx={{ height: 60 }} />
+          </Box>
+          
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#15803d', textAlign: { xs: 'center', md: 'left' } }}>
             Sign In
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secure access via HttpOnly JWT cookie.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: { xs: 'center', md: 'left' } }}>
+            Login to your account to continue
           </Typography>
+
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2}>
               {error && <Alert severity="error">{error}</Alert>}
+              
               <TextField
                 label="Email"
+                type="email"
                 value={form.email}
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                 fullWidth
+                required
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '&:hover fieldset': { borderColor: '#15803d' },
+                    '&.Mui-focused fieldset': { borderColor: '#15803d' },
+                  },
+                }}
               />
+              
               <TextField
                 label="Password"
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                 fullWidth
+                required
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '&:hover fieldset': { borderColor: '#15803d' },
+                    '&.Mui-focused fieldset': { borderColor: '#15803d' },
+                  },
+                }}
               />
-              <Button type="submit" variant="contained" size="large">
-                Login
+              
+              <Button type="submit" variant="contained" size="large" sx={{ background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)', py: 1.5, fontWeight: 600, mt: 1 }}>
+                Sign In
               </Button>
-              <Button component={Link} to="/vendor/register" variant="text" size="small">
-                New Vendor? Register Here
-              </Button>
-              <Button component={Link} to="/forgot-password" variant="text" size="small">
-                Forgot Password?
-              </Button>
+
+              <Stack spacing={1} sx={{ mt: 2 }}>
+                <Button component={Link} to="/forgot-password" variant="text" size="small" sx={{ color: '#15803d' }}>
+                  Forgot Password?
+                </Button>
+                <Button component={Link} to="/vendor/register" variant="text" size="small" sx={{ color: '#15803d' }}>
+                  New Vendor? Register Here
+                </Button>
+              </Stack>
             </Stack>
           </Box>
-        </CardContent>
-      </Card>
+        </Box>
+      </Box>
+
       <Snackbar
         open={Boolean(toastMessage)}
         autoHideDuration={4500}

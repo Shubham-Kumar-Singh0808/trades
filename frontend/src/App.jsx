@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import api from './api/client';
 import ProtectedRoute from './components/ProtectedRoute';
 import ShellLayout from './components/ShellLayout';
+import SplashScreen from './components/SplashScreen';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
@@ -43,7 +44,7 @@ export default function App() {
   };
 
   if (isBootstrapping) {
-    return null;
+    return <SplashScreen />;
   }
 
   return (

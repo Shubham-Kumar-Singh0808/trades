@@ -1,0 +1,6 @@
+<svg width="200" height="50" viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="50" fill="#093b3b" rx="4"/>
+  <text x="100" y="32" font-size="24" font-weight="bold" fill="white" text-anchor="middle" font-family="Poppins">
+    Pawfect Trades
+  </text>
+</svg>

@@ -1,4 +1,4 @@
-import { Alert, Button, Card, CardContent, Pagination, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Alert, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Pagination, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 
@@ -7,6 +7,7 @@ export default function VendorsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState({ name: '', companyName: '', mobileNo: '', email: '' });
 
   const load = async (targetPage = page) => {
@@ -33,6 +34,7 @@ export default function VendorsPage() {
       await api.post('/api/vendors', form);
       setForm({ name: '', companyName: '', mobileNo: '', email: '' });
       setSuccess('Vendor created. Invitation email sent to set password and activate account.');
+      setCreateModalOpen(false);
       load(1);
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to create vendor');
@@ -47,20 +49,10 @@ export default function VendorsPage() {
 
       <Card>
         <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Create Vendor</Typography>
-          <Stack component="form" onSubmit={createVendor} direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <TextField label="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-            <TextField label="Company" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} />
-            <TextField label="Mobile" value={form.mobileNo} onChange={(e) => setForm((p) => ({ ...p, mobileNo: e.target.value }))} />
-            <TextField label="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-            <Button type="submit" variant="contained">Create</Button>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">Vendor List</Typography>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)}>Add Vendor</Button>
           </Stack>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Vendor List</Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -96,6 +88,22 @@ export default function VendorsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={createModalOpen} onClose={() => setCreateModalOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Create Vendor</DialogTitle>
+        <DialogContent>
+          <Stack component="form" onSubmit={(e) => { createVendor(e); }} spacing={2} sx={{ mt: 1 }}>
+            <TextField label="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} fullWidth />
+            <TextField label="Company" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} fullWidth />
+            <TextField label="Mobile" value={form.mobileNo} onChange={(e) => setForm((p) => ({ ...p, mobileNo: e.target.value }))} fullWidth />
+            <TextField label="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} fullWidth />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
+          <Button onClick={createVendor} variant="contained">Create</Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
