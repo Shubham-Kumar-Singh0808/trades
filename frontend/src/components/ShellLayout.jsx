@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { Person, Menu as MenuIcon, Close as CloseIcon } from '@mui/icons-material';
 import { useState } from 'react';
 import logo from '../assets/images/logo.png';
-import logoVideo from '../assets/images/Logo.mp4';
 
 export default function ShellLayout({ onLogout, children, session }) {
   const navigate = useNavigate();
@@ -201,12 +200,9 @@ export default function ShellLayout({ onLogout, children, session }) {
               )}
             </IconButton>
             <Box
-              component="video"
-              src={logoVideo}
-              autoPlay
-              muted
-              loop
-              playsInline
+              component="img"
+              src={logo}
+              alt="Pawfect Trades Logo"
               sx={{ height: 50, width: 'auto', mr: 2, objectFit: 'contain' }}
             />
             <Stack direction="row" spacing={1} sx={{ ml: 'auto', alignItems: 'center' }}>
