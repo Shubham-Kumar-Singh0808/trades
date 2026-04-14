@@ -51,7 +51,7 @@ export default function VendorsPage() {
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">Vendor List</Typography>
-            <Button variant="contained" onClick={() => setCreateModalOpen(true)}>Add Vendor</Button>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Add Vendor</Button>
           </Stack>
           <Table size="small">
             <TableHead>
@@ -100,8 +100,8 @@ export default function VendorsPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
-          <Button onClick={createVendor} variant="contained">Create</Button>
+          <Button onClick={() => setCreateModalOpen(false)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button onClick={createVendor} variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>Create</Button>
         </DialogActions>
       </Dialog>
     </Stack>

@@ -195,7 +195,7 @@ export default function VendorRegistrationPage() {
             </Stack>
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 1 }}>
-              <Button type="submit" variant="contained" size="large" fullWidth sx={{ background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)', py: 1.5, fontWeight: 600 }}>
+              <Button type="submit" variant="contained" size="large" fullWidth sx={{ background: 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)', boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)', py: 1.5, fontWeight: 700, transition: 'all 0.3s ease', '&:hover': { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' } }}>
                 Register Vendor
               </Button>
             </Stack>

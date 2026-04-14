@@ -34,8 +34,8 @@ export default function ForgotPasswordPage() {
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
             <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required fullWidth />
-            <Button type="submit" variant="contained" size="large">Send Link</Button>
-            <Button component={Link} to="/login" variant="text">Back to Login</Button>
+            <Button type="submit" variant="contained" size="large" sx={{ backgroundColor: '#3a8a3a', background: 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)', boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)', fontWeight: 700, transition: 'all 0.3s ease', '&:hover': { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' } }}>Send Link</Button>
+            <Button component={Link} to="/login" variant="text" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)' } }}>Back to Login</Button>
           </Stack>
         </CardContent>
       </Card>

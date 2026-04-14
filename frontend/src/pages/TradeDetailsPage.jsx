@@ -76,7 +76,7 @@ export default function TradeDetailsPage() {
       <Card>
         <CardContent>
           <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-            <Button variant="contained" onClick={openDownload}>Download (Watermarked)</Button>
+            <Button variant="contained" onClick={openDownload} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Download (Watermarked)</Button>
           </Stack>
           <Box sx={{ border: '1px solid #d6dce1', borderRadius: 2, overflow: 'hidden' }}>
             {pdfUrl ? (

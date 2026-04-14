@@ -4,7 +4,9 @@ const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#0f766e',
+      main: '#3a8a3a',
+      light: '#5ba55b',
+      dark: '#2d6b2d',
     },
     secondary: {
       main: '#f59e0b',
@@ -28,10 +30,48 @@ const theme = createTheme({
     button: {
       textTransform: 'none',
       fontWeight: 600,
+      letterSpacing: '0.5px',
     },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 8,
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        contained: {
+          boxShadow: '0 2px 8px rgba(58, 138, 58, 0.25)',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(58, 138, 58, 0.35)',
+            transform: 'translateY(-2px)',
+          },
+          '&:active': {
+            transform: 'translateY(0px)',
+          },
+        },
+        outlined: {
+          borderWidth: '2px',
+          '&:hover': {
+            borderWidth: '2px',
+            backgroundColor: 'rgba(58, 138, 58, 0.04)',
+          },
+        },
+      },
+      defaultProps: {
+        disableElevation: false,
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            backgroundColor: 'rgba(58, 138, 58, 0.08)',
+          },
+        },
+      },
+    },
   },
 });
 

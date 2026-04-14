@@ -101,7 +101,7 @@ export default function TradesPage() {
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">Trade List</Typography>
-            <Button variant="contained" onClick={() => setCreateModalOpen(true)}>Create Trade</Button>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Create Trade</Button>
           </Stack>
           <Table size="small">
             <TableHead>
@@ -121,7 +121,7 @@ export default function TradesPage() {
                   <TableCell>{t.description}</TableCell>
                   <TableCell>{t.createdBy}</TableCell>
                   <TableCell>
-                    <Button component={Link} to={`/trades/${t.id}`} size="small">Open</Button>
+                    <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -194,7 +194,7 @@ export default function TradesPage() {
               )}
             </Stack>
             <Box>
-              <Button component="label" variant="outlined">
+              <Button component="label" variant="outlined" sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)', borderColor: '#3a8a3a' } }}>
                 Upload PDF
                 <input
                   type="file"
@@ -210,8 +210,8 @@ export default function TradesPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
-          <Button onClick={createTrade} variant="contained">Create Trade</Button>
+          <Button onClick={() => setCreateModalOpen(false)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button onClick={createTrade} variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>Create Trade</Button>
         </DialogActions>
       </Dialog>
     </Stack>

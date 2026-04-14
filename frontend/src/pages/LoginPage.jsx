@@ -116,15 +116,15 @@ export default function LoginPage({ onLoginSuccess }) {
                 }}
               />
               
-              <Button type="submit" variant="contained" size="large" sx={{ background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)', py: 1.5, fontWeight: 600, mt: 1 }}>
+              <Button type="submit" variant="contained" size="large" sx={{ background: 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)', boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)', py: 1.5, fontWeight: 700, transition: 'all 0.3s ease', '&:hover': { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' }, mt: 1 }}>
                 Sign In
               </Button>
 
               <Stack spacing={1} sx={{ mt: 2 }}>
-                <Button component={Link} to="/forgot-password" variant="text" size="small" sx={{ color: '#15803d' }}>
+                <Button component={Link} to="/forgot-password" variant="text" size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)' } }}>
                   Forgot Password?
                 </Button>
-                <Button component={Link} to="/vendor/register" variant="text" size="small" sx={{ color: '#15803d' }}>
+                <Button component={Link} to="/vendor/register" variant="text" size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)' } }}>
                   New Vendor? Register Here
                 </Button>
               </Stack>

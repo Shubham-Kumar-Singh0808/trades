@@ -136,7 +136,7 @@ export default function UsersPage() {
         <CardContent sx={{ width: '100%', p: { xs: 2, sm: 3 }, overflow: 'hidden' }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 2, gap: 1 }}>
             <Typography variant="h6">User List</Typography>
-            <Button variant="contained" onClick={() => setCreateModalOpen(true)}>Add User</Button>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Add User</Button>
           </Stack>
           <Box sx={{ overflowX: 'auto', overflowY: 'hidden', width: '100%', WebkitOverflowScrolling: 'touch' }}>
             <Table size="small" sx={{ width: '100%', minWidth: 600 }}>
@@ -227,8 +227,8 @@ export default function UsersPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditingUser(null)}>Cancel</Button>
-          <Button onClick={saveEdit} variant="contained">Save</Button>
+          <Button onClick={() => setEditingUser(null)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button onClick={saveEdit} variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>Save</Button>
         </DialogActions>
       </Dialog>
 
@@ -257,8 +257,8 @@ export default function UsersPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
-          <Button onClick={(e) => { createUser(e); setCreateModalOpen(false); }} variant="contained">Create</Button>
+          <Button onClick={() => setCreateModalOpen(false)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button onClick={(e) => { createUser(e); setCreateModalOpen(false); }} variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>Create</Button>
         </DialogActions>
       </Dialog>
     </Stack>

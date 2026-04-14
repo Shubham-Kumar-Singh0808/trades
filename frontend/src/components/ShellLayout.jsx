@@ -1,4 +1,4 @@
-import { AppBar, Box, Button, Container, IconButton, List, ListItem, ListItemButton, ListItemText, Menu, MenuItem, Stack, Toolbar, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { AppBar, Box, Button, Container, IconButton, List, ListItem, ListItemButton, ListItemText, Menu, MenuItem, Stack, Toolbar, Typography } from '@mui/material';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Person, Menu as MenuIcon, Close as CloseIcon } from '@mui/icons-material';
 import { useState } from 'react';
@@ -6,11 +6,9 @@ import logo from '../assets/images/logo.png';
 
 export default function ShellLayout({ onLogout, children, session }) {
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const roles = session?.roles || [];
   const [anchorEl, setAnchorEl] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const open = Boolean(anchorEl);
 
   const handleMenuOpen = (event) => {
@@ -35,7 +33,6 @@ export default function ShellLayout({ onLogout, children, session }) {
 
   const handleNavClick = (to) => {
     navigate(to);
-    setSidebarOpen(false);
   };
 
   return (
@@ -44,61 +41,50 @@ export default function ShellLayout({ onLogout, children, session }) {
       {sidebarOpen && (
         <Box
           sx={{
-            width: { xs: '100%', sm: 280 },
-            background: 'linear-gradient(180deg, #093b3b 0%, #0a4c4c 100%)',
+            width: 280,
+            background: 'linear-gradient(180deg, #3a8a3a 0%, #428a42 100%)',
             color: 'white',
             boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)',
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
-            position: { xs: 'fixed', sm: 'fixed' },
+            position: 'fixed',
             top: 0,
             left: 0,
-            zIndex: 1001,
+            zIndex: 999,
             overflowY: 'auto',
           }}
         >
           {/* Sidebar Header */}
           <Box
             sx={{
-              background: 'linear-gradient(135deg, #093b3b 0%, #0a4c4c 100%)',
+              background: 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)',
               p: 3,
               borderBottom: '2px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
             }}
           >
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: '1.3rem',
-                  letterSpacing: '0.5px',
-                  color: 'white',
-                }}
-              >
-                Pawfect Trades
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: '0.75rem',
-                  marginTop: '4px',
-                  display: 'block',
-                }}
-              >
-                Management System
-              </Typography>
-            </Box>
-            <IconButton
-              onClick={() => setSidebarOpen(false)}
-              sx={{ color: 'white', mt: -1 }}
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                fontSize: '1.3rem',
+                letterSpacing: '0.5px',
+                color: 'white',
+              }}
             >
-              <CloseIcon />
-            </IconButton>
+              Pawfect Trades
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.75rem',
+                marginTop: '4px',
+                display: 'block',
+              }}
+            >
+              Management System
+            </Typography>
           </Box>
 
           {/* Navigation Items */}
@@ -121,9 +107,12 @@ export default function ShellLayout({ onLogout, children, session }) {
                       color: 'white',
                     },
                     '&.active': {
-                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                      color: '#f59e0b',
-                      borderLeft: 'none',
+                      backgroundColor: 'rgba(220, 38, 38, 0.25)',
+                      color: '#ffffff',
+                      borderLeft: '4px solid #dc2626',
+                      paddingLeft: '12px',
+                      fontWeight: 600,
+                      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
                     },
                   }}
                 >
@@ -154,33 +143,16 @@ export default function ShellLayout({ onLogout, children, session }) {
         </Box>
       )}
 
-      {/* Backdrop for mobile when sidebar is open */}
-      {sidebarOpen && isMobile && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 998,
-            onClick: () => setSidebarOpen(false),
-          }}
-        />
-      )}
-
       {/* Main Content Wrapper */}
       <Box
         sx={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          ml: 0,
+          ml: sidebarOpen ? '280px' : 0,
           transition: 'margin-left 0.3s ease',
           background: 'linear-gradient(160deg, #eef6f6 0%, #f8fbff 100%)',
           minHeight: '100vh',
-          width: '100%',
         }}
       >
         {/* Navbar */}
@@ -236,11 +208,7 @@ export default function ShellLayout({ onLogout, children, session }) {
         </AppBar>
 
         {/* Page Content */}
-        <Box sx={{ py: 4, flex: 1, width: '100%', overflow: 'auto' }}>
-          <Container maxWidth={false} sx={{ width: '100%', px: { xs: 2, sm: 3 } }}>
-            {children}
-          </Container>
-        </Box>
+        <Container sx={{ py: 4, flex: 1 }}>{children}</Container>
       </Box>
     </Box>
   );

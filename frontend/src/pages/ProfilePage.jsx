@@ -43,7 +43,7 @@ export default function ProfilePage({ session, onSessionRefresh }) {
             {isVendor && (
               <TextField label="Company Name" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} fullWidth required />
             )}
-            <Button type="submit" variant="contained">Update Profile</Button>
+            <Button type="submit" variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, fontWeight: 600, py: 1.2 }}>Update Profile</Button>
           </Stack>
         </CardContent>
       </Card>

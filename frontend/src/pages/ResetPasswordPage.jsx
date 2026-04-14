@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
             {error && <Alert severity="error">{error}</Alert>}
             <TextField label="New Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth required />
             <TextField label="Confirm Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} fullWidth required />
-            <Button type="submit" variant="contained" size="large" disabled={loading}>{loading ? 'Saving...' : 'Reset Password'}</Button>
+            <Button type="submit" variant="contained" size="large" disabled={loading} sx={{ backgroundColor: '#3a8a3a', background: loading ? 'rgba(58, 138, 58, 0.5)' : 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)', boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)', fontWeight: 700, transition: 'all 0.3s ease', '&:hover': loading ? {} : { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' } }}>{loading ? 'Saving...' : 'Reset Password'}</Button>
           </Stack>
         </CardContent>
       </Card>
