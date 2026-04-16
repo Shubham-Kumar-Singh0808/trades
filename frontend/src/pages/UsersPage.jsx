@@ -171,7 +171,10 @@ export default function UsersPage() {
                     <TableCell>
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title="Edit">
-                          <IconButton size="small" onClick={() => setEditingUser({ ...u, role: roleFromUser(u) })} color="primary">
+                          <IconButton size="small" onClick={() => {
+                            const currentRole = roleFromUser(u);
+                            setEditingUser({ ...u, role: currentRole, originalRole: currentRole });
+                          }} color="primary">
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -211,16 +214,25 @@ export default function UsersPage() {
         <DialogContent>
           {editingUser && (
             <Stack spacing={2} sx={{ mt: 1 }}>
+              {editingUser.originalRole === 'VENDOR' && (
+                <Alert severity="info">Vendor role cannot be changed.</Alert>
+              )}
               <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={editingUser.role}
                   label="Role"
+                  disabled={editingUser.originalRole === 'VENDOR'}
                   onChange={(e) => setEditingUser((p) => ({ ...p, role: e.target.value, companyName: e.target.value === 'VENDOR' ? p.companyName : '' }))}
                 >
-                  <MenuItem value="VENDOR">VENDOR</MenuItem>
-                  <MenuItem value="EXECUTIVE">EXECUTIVE</MenuItem>
-                  <MenuItem value="ADMIN">ADMIN</MenuItem>
+                  {editingUser.originalRole === 'VENDOR' ? (
+                    <MenuItem value="VENDOR">VENDOR</MenuItem>
+                  ) : (
+                    [
+                      <MenuItem key="EXECUTIVE" value="EXECUTIVE">EXECUTIVE</MenuItem>,
+                      <MenuItem key="ADMIN" value="ADMIN">ADMIN</MenuItem>,
+                    ]
+                  )}
                 </Select>
               </FormControl>
               <TextField label="Name" value={editingUser.name || ''} onChange={(e) => setEditingUser((p) => ({ ...p, name: e.target.value }))} fullWidth />

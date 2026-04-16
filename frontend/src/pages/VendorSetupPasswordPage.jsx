@@ -67,7 +67,20 @@ export default function VendorSetupPasswordPage() {
               fullWidth
             />
 
-            <Button type="submit" variant="contained" size="large" disabled={loading} sx={{ backgroundColor: '#3a8a3a', background: disabled ? 'rgba(58, 138, 58, 0.5)' : 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)', boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)', fontWeight: 700, transition: 'all 0.3s ease', '&:hover': disabled ? {} : { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' } }}>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={loading}
+              sx={{
+                backgroundColor: '#3a8a3a',
+                background: loading ? 'rgba(58, 138, 58, 0.5)' : 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)',
+                boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)',
+                fontWeight: 700,
+                transition: 'all 0.3s ease',
+                '&:hover': loading ? {} : { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' },
+              }}
+            >
               {loading ? 'Saving...' : 'Set Password'}
             </Button>
           </Stack>

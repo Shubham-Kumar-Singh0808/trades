@@ -36,7 +36,17 @@ export default function LoginPage({ onLoginSuccess }) {
     e.preventDefault();
     setError('');
     try {
-      await api.post('/api/auth/login', form);
+      const res = await api.post('/api/auth/login', form, { suppressErrorToast: true });
+
+      if (res.data?.requiresPasswordSetup) {
+        if (!res.data?.setupToken) {
+          setError('Temporary login is enabled but setup token is missing. Please contact admin.');
+          return;
+        }
+        navigate(`/setup-password?token=${encodeURIComponent(res.data.setupToken)}`, { replace: true });
+        return;
+      }
+
       await onLoginSuccess();
       navigate(redirectTo, { replace: true });
     } catch (err) {
@@ -48,7 +58,7 @@ export default function LoginPage({ onLoginSuccess }) {
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 0 }, maxWidth: 900, width: '100%', background: 'white', borderRadius: { xs: '16px', md: '24px' }, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)' }}>
         {/* Left Side - Welcome Section (Light background for visibility) */}
-        <Box sx={{ background: '#f8faf6', color: '#1f2937', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', p: { xs: 3, md: 4 }, position: 'relative', overflow: 'hidden', display: { xs: 'none', md: 'flex' } }}>
+        <Box sx={{ background: '#f8faf6', color: '#1f2937', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', p: { xs: 3, md: 4 }, position: 'relative', overflow: 'hidden', display: { xs: 'none', md: 'flex' } }}>
           {/* Decorative Wave */}
           <Box sx={{ position: 'absolute', bottom: 0, right: -50, width: 300, height: 300, background: 'rgba(21, 128, 61, 0.05)', borderRadius: '50%' }} />
           <Box sx={{ position: 'absolute', top: -100, right: -100, width: 250, height: 250, background: 'rgba(21, 128, 61, 0.03)', borderRadius: '50%' }} />

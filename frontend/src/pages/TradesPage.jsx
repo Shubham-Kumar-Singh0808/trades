@@ -26,6 +26,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 
+const getModeLabel = (mode) => {
+  if (mode === 'ONLINE') return 'DIRECT';
+  if (mode === 'HYBRID') return 'HOPPING';
+  return mode;
+};
+
 export default function TradesPage() {
   const [data, setData] = useState(null);
   const [vendors, setVendors] = useState([]);
@@ -38,7 +44,8 @@ export default function TradesPage() {
     description: '',
     notificationScope: 'ALL_ACTIVE',
     vendorIds: [],
-    file: null,
+    jobSheetFile: null,
+    trackingListFile: null,
   });
 
   const loadTrades = async (targetPage = page) => {
@@ -70,6 +77,12 @@ export default function TradesPage() {
   const createTrade = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!form.jobSheetFile || !form.trackingListFile) {
+      setError('Both Job Sheet PDF and Tracking List PDF are required.');
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append('tradeId', form.tradeId);
@@ -79,12 +92,11 @@ export default function TradesPage() {
       if (form.notificationScope === 'SELECTED') {
         form.vendorIds.forEach((id) => formData.append('vendorIds', id));
       }
-      if (form.file) {
-        formData.append('file', form.file);
-      }
+      formData.append('jobSheetFile', form.jobSheetFile);
+      formData.append('trackingListFile', form.trackingListFile);
 
       await api.post('/api/trades', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setForm({ tradeId: '', mode: 'ONLINE', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], file: null });
+      setForm({ tradeId: '', mode: 'ONLINE', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], jobSheetFile: null, trackingListFile: null });
       setCreateModalOpen(false);
       loadTrades(1);
     } catch (err) {
@@ -117,7 +129,7 @@ export default function TradesPage() {
               {data?.content?.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell>{t.tradeId}</TableCell>
-                  <TableCell>{t.mode}</TableCell>
+                  <TableCell>{getModeLabel(t.mode)}</TableCell>
                   <TableCell>{t.description}</TableCell>
                   <TableCell>{t.createdBy}</TableCell>
                   <TableCell>
@@ -150,9 +162,8 @@ export default function TradesPage() {
               <FormControl fullWidth>
                 <InputLabel>Mode</InputLabel>
                 <Select value={form.mode} label="Mode" onChange={(e) => setForm((p) => ({ ...p, mode: e.target.value }))}>
-                  <MenuItem value="ONLINE">ONLINE</MenuItem>
-                  <MenuItem value="OFFLINE">OFFLINE</MenuItem>
-                  <MenuItem value="HYBRID">HYBRID</MenuItem>
+                  <MenuItem value="ONLINE">DIRECT</MenuItem>
+                  <MenuItem value="HYBRID">HOPPING</MenuItem>
                 </Select>
               </FormControl>
             </Stack>
@@ -195,16 +206,30 @@ export default function TradesPage() {
             </Stack>
             <Box>
               <Button component="label" variant="outlined" sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)', borderColor: '#3a8a3a' } }}>
-                Upload PDF
+                Upload Job Sheet PDF
                 <input
                   type="file"
                   hidden
                   accept="application/pdf"
-                  onChange={(e) => setForm((p) => ({ ...p, file: e.target.files?.[0] || null }))}
+                  onChange={(e) => setForm((p) => ({ ...p, jobSheetFile: e.target.files?.[0] || null }))}
                 />
               </Button>
               <Typography variant="caption" sx={{ ml: 1 }}>
-                {form.file ? form.file.name : 'No file selected'}
+                {form.jobSheetFile ? form.jobSheetFile.name : 'No file selected'}
+              </Typography>
+            </Box>
+            <Box>
+              <Button component="label" variant="outlined" sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)', borderColor: '#3a8a3a' } }}>
+                Upload Tracking List PDF
+                <input
+                  type="file"
+                  hidden
+                  accept="application/pdf"
+                  onChange={(e) => setForm((p) => ({ ...p, trackingListFile: e.target.files?.[0] || null }))}
+                />
+              </Button>
+              <Typography variant="caption" sx={{ ml: 1 }}>
+                {form.trackingListFile ? form.trackingListFile.name : 'No file selected'}
               </Typography>
             </Box>
           </Stack>

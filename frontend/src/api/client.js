@@ -52,8 +52,11 @@ api.interceptors.response.use(
       loaderContext.setIsLoading(false);
     }
     
+    // Allow callers to suppress global error toast for expected failures (e.g. /api/auth/me when logged out)
+    const suppressErrorToast = Boolean(error?.config?.suppressErrorToast);
+
     // Show error toast
-    if (toastContext) {
+    if (!suppressErrorToast && toastContext) {
       const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
       toastContext.showToast(errorMessage, 'error', 4000);
     }

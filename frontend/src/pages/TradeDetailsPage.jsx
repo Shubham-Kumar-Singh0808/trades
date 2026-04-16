@@ -3,28 +3,45 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api/client';
 
+const getModeLabel = (mode) => {
+  if (mode === 'ONLINE') return 'DIRECT';
+  if (mode === 'HYBRID') return 'HOPPING';
+  return mode;
+};
+
 export default function TradeDetailsPage() {
   const { id } = useParams();
   const [trade, setTrade] = useState(null);
   const [error, setError] = useState('');
-  const [pdfUrl, setPdfUrl] = useState('');
+  const [jobSheetPdfUrl, setJobSheetPdfUrl] = useState('');
+  const [trackingListPdfUrl, setTrackingListPdfUrl] = useState('');
 
   useEffect(() => {
-    let createdUrl = null;
+    let createdJobSheetUrl = null;
+    let createdTrackingListUrl = null;
 
     const load = async () => {
       try {
-        const [tradeRes, pdfRes] = await Promise.all([
+        const [tradeRes, jobSheetRes, trackingListRes] = await Promise.all([
           api.get(`/api/trades/${id}`),
-          api.get(`/api/trades/${id}/view`, { responseType: 'blob' }),
+          api.get(`/api/trades/${id}/job-sheet/view`, { responseType: 'blob' }),
+          api.get(`/api/trades/${id}/tracking-list/view`, { responseType: 'blob' }),
         ]);
         setTrade(tradeRes.data);
-        createdUrl = URL.createObjectURL(new Blob([pdfRes.data], { type: 'application/pdf' }));
-        setPdfUrl((old) => {
+        createdJobSheetUrl = URL.createObjectURL(new Blob([jobSheetRes.data], { type: 'application/pdf' }));
+        createdTrackingListUrl = URL.createObjectURL(new Blob([trackingListRes.data], { type: 'application/pdf' }));
+
+        setJobSheetPdfUrl((old) => {
           if (old) {
             URL.revokeObjectURL(old);
           }
-          return createdUrl;
+          return createdJobSheetUrl;
+        });
+        setTrackingListPdfUrl((old) => {
+          if (old) {
+            URL.revokeObjectURL(old);
+          }
+          return createdTrackingListUrl;
         });
       } catch (err) {
         setError(err?.response?.data?.message || 'Failed to load trade details');
@@ -33,25 +50,44 @@ export default function TradeDetailsPage() {
     load();
 
     return () => {
-      if (createdUrl) {
-        URL.revokeObjectURL(createdUrl);
+      if (createdJobSheetUrl) {
+        URL.revokeObjectURL(createdJobSheetUrl);
+      }
+      if (createdTrackingListUrl) {
+        URL.revokeObjectURL(createdTrackingListUrl);
       }
     };
   }, [id]);
 
-  const openDownload = async () => {
+  const downloadJobSheet = async () => {
     try {
-      const res = await api.get(`/api/trades/${id}/download`, { responseType: 'blob' });
+      const res = await api.get(`/api/trades/${id}/job-sheet/download`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `trade-${id}.pdf`;
+      a.download = `trade-${id}-job-sheet.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to download trade PDF');
+      setError(err?.response?.data?.message || 'Failed to download job sheet PDF');
+    }
+  };
+
+  const downloadTrackingList = async () => {
+    try {
+      const res = await api.get(`/api/trades/${id}/tracking-list/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trade-${id}-tracking-list.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to download tracking list PDF');
     }
   };
 
@@ -64,7 +100,7 @@ export default function TradeDetailsPage() {
           <CardContent>
             <Stack spacing={1}>
               <Typography><strong>Trade ID:</strong> {trade.tradeId}</Typography>
-              <Typography><strong>Mode:</strong> {trade.mode}</Typography>
+              <Typography><strong>Mode:</strong> {getModeLabel(trade.mode)}</Typography>
               <Typography><strong>Description:</strong> {trade.description}</Typography>
               <Typography><strong>Created By:</strong> {trade.createdBy}</Typography>
               <Typography><strong>Created At:</strong> {trade.createdAt}</Typography>
@@ -76,18 +112,34 @@ export default function TradeDetailsPage() {
       <Card>
         <CardContent>
           <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-            <Button variant="contained" onClick={openDownload} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Download (Watermarked)</Button>
+            <Button variant="contained" onClick={downloadJobSheet} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Download Job Sheet</Button>
+            <Button variant="contained" onClick={downloadTrackingList} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Download Tracking List</Button>
           </Stack>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Job Sheet PDF</Typography>
           <Box sx={{ border: '1px solid #d6dce1', borderRadius: 2, overflow: 'hidden' }}>
-            {pdfUrl ? (
+            {jobSheetPdfUrl ? (
               <iframe
-                title="Trade PDF"
-                src={pdfUrl}
-                style={{ width: '100%', height: '75vh', border: 0 }}
+                title="Job Sheet PDF"
+                src={jobSheetPdfUrl}
+                style={{ width: '100%', height: '60vh', border: 0 }}
               />
             ) : (
               <Box sx={{ p: 3 }}>
-                <Typography color="text.secondary">Loading PDF preview...</Typography>
+                <Typography color="text.secondary">Loading job sheet preview...</Typography>
+              </Box>
+            )}
+          </Box>
+          <Typography variant="subtitle1" sx={{ mt: 3, mb: 1, fontWeight: 600 }}>Tracking List PDF</Typography>
+          <Box sx={{ border: '1px solid #d6dce1', borderRadius: 2, overflow: 'hidden' }}>
+            {trackingListPdfUrl ? (
+              <iframe
+                title="Tracking List PDF"
+                src={trackingListPdfUrl}
+                style={{ width: '100%', height: '60vh', border: 0 }}
+              />
+            ) : (
+              <Box sx={{ p: 3 }}>
+                <Typography color="text.secondary">Loading tracking list preview...</Typography>
               </Box>
             )}
           </Box>

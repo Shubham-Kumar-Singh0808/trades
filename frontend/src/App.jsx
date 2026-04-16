@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import api from './api/client';
 import ProtectedRoute from './components/ProtectedRoute';
 import ShellLayout from './components/ShellLayout';
@@ -19,10 +19,19 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const location = useLocation();
+
+  const skipBootstrapRoutes = [
+    '/setup-password',
+    '/vendor/setup-password',
+    '/vendor/register',
+    '/forgot-password',
+    '/reset-password',
+  ];
 
   const bootstrap = async () => {
     try {
-      const res = await api.get('/api/auth/me');
+      const res = await api.get('/api/auth/me', { suppressErrorToast: true });
       setSession(res.data);
       setIsAuthenticated(true);
     } catch {
@@ -34,8 +43,16 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (skipBootstrapRoutes.includes(location.pathname)) {
+      setSession(null);
+      setIsAuthenticated(false);
+      setIsBootstrapping(false);
+      return;
+    }
+
+    setIsBootstrapping(true);
     bootstrap();
-  }, []);
+  }, [location.pathname]);
 
   const logout = async () => {
     await api.post('/api/auth/logout');
@@ -106,7 +123,7 @@ export default function App() {
         element={
           <ProtectedRoute isAuthenticated={isAuthenticated} session={session}>
             <ShellLayout onLogout={logout} session={session}>
-              <VendorsPage />
+              <VendorsPage session={session} />
             </ShellLayout>
           </ProtectedRoute>
         }
@@ -116,7 +133,7 @@ export default function App() {
         element={
           <ProtectedRoute isAuthenticated={isAuthenticated} session={session}>
             <ShellLayout onLogout={logout} session={session}>
-              <TradesPage />
+              <TradesPage session={session} />
             </ShellLayout>
           </ProtectedRoute>
         }
@@ -126,7 +143,7 @@ export default function App() {
         element={
           <ProtectedRoute isAuthenticated={isAuthenticated} session={session}>
             <ShellLayout onLogout={logout} session={session}>
-              <TradeDetailsPage />
+              <TradeDetailsPage session={session} />
             </ShellLayout>
           </ProtectedRoute>
         }
