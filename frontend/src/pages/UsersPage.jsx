@@ -27,6 +27,7 @@ import {
 import { Edit as EditIcon, Delete as DeleteIcon, Visibility as VisibilityIcon, VisibilityOff as VisibilityOffIcon } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import api from '../api/client';
+import { useDeleteConfirm } from '../context/DeleteConfirmContext';
 
 export default function UsersPage() {
   const [data, setData] = useState(null);
@@ -34,6 +35,7 @@ export default function UsersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const { showConfirm } = useDeleteConfirm();
   const [form, setForm] = useState({
     role: 'VENDOR',
     name: '',
@@ -88,14 +90,18 @@ export default function UsersPage() {
   };
 
   const removeUser = async (user) => {
-    setError('');
-    setSuccess('');
+    const confirmed = await showConfirm(
+      'Delete User',
+      `Are you sure you want to delete user "${user.email}"? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
     try {
       await api.delete(`/api/admin/users/${user.id}`);
-      setSuccess('User deleted successfully.');
       load(1);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to delete user');
+      // Error is handled by API interceptor toast
     }
   };
 

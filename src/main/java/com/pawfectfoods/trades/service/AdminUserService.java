@@ -119,7 +119,11 @@ public class AdminUserService {
     @Transactional
     public void deleteUser(UUID userId) {
         AppUser user = findUserById(userId);
+        // Delete associated email verification tokens
+        tokenRepository.deleteByUser(user);
+        // Delete associated vendor if exists
         vendorRepository.findByEmail(user.getEmail()).ifPresent(vendorRepository::delete);
+        // Delete the user
         appUserRepository.delete(user);
     }
 
