@@ -2,6 +2,12 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
+  Container,
+  Divider,
+  Grid,
+  InputAdornment,
   Stack,
   TextField,
   Typography,
@@ -13,60 +19,75 @@ import logo from '../assets/images/logo.png';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const emptyContact = { name: '', designation: '', email: '', phone: '' };
+
 const emptyFieldErrors = {
   name: '',
-  companyName: '',
-  mobileNo: '',
+  gstNo: '',
+  officeAddress: '',
   email: '',
   password: '',
   confirmPassword: '',
+  companyName: '',
+  registeredAddress: '',
+  contacts: [
+    { ...emptyContact },
+    { ...emptyContact },
+    { ...emptyContact },
+  ],
 };
 
 export default function VendorRegistrationPage() {
   const [form, setForm] = useState({
     name: '',
+    gstNo: '',
     companyName: '',
-    mobileNo: '',
+    registeredAddress: '',
+    officeAddress: '',
     email: '',
     password: '',
     confirmPassword: '',
+    contacts: [
+      { ...emptyContact },
+      { ...emptyContact },
+      { ...emptyContact },
+    ],
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [gstLoading, setGstLoading] = useState(false);
+  const [gstStatus, setGstStatus] = useState(null);
   const [fieldErrors, setFieldErrors] = useState(emptyFieldErrors);
 
+  const setFieldValue = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => ({ ...prev, [key]: '' }));
+  };
+
+  const setContact = (index, key, value) => {
+    setForm((prev) => {
+      const contacts = [...prev.contacts];
+      contacts[index] = { ...contacts[index], [key]: value };
+      return { ...prev, contacts };
+    });
+  };
+
   const validateForm = () => {
-    const nextErrors = { ...emptyFieldErrors };
+    const nextErrors = {
+      ...emptyFieldErrors,
+      contacts: [{ ...emptyContact }, { ...emptyContact }, { ...emptyContact }],
+    };
 
-    const name = form.name.trim();
-    const companyName = form.companyName.trim();
-    const mobileNo = form.mobileNo.trim();
-    const email = form.email.trim();
+    if (!form.name.trim()) nextErrors.name = 'Name is required';
+    if (!form.gstNo.trim()) nextErrors.gstNo = 'GST number is required';
+    if (!form.companyName.trim()) nextErrors.companyName = 'Fetch GST details first';
+    if (!form.registeredAddress.trim()) nextErrors.registeredAddress = 'Fetch GST details first';
+    if (!form.officeAddress.trim()) nextErrors.officeAddress = 'Office address is required';
 
-    if (!name) {
-      nextErrors.name = 'Name is required';
-    } else if (name.length > 100) {
-      nextErrors.name = 'Name must be at most 100 characters';
-    }
-
-    if (!companyName) {
-      nextErrors.companyName = 'Company name is required';
-    } else if (companyName.length > 150) {
-      nextErrors.companyName = 'Company name must be at most 150 characters';
-    }
-
-    if (!mobileNo) {
-      nextErrors.mobileNo = 'Mobile number is required';
-    } else if (mobileNo.length > 20) {
-      nextErrors.mobileNo = 'Mobile number must be at most 20 characters';
-    }
-
-    if (!email) {
+    if (!form.email.trim()) {
       nextErrors.email = 'Email is required';
-    } else if (email.length > 150) {
-      nextErrors.email = 'Email must be at most 150 characters';
-    } else if (!EMAIL_REGEX.test(email)) {
+    } else if (!EMAIL_REGEX.test(form.email.trim())) {
       nextErrors.email = 'Enter a valid email address';
     }
 
@@ -82,37 +103,61 @@ export default function VendorRegistrationPage() {
       nextErrors.confirmPassword = 'Password and confirm password must match';
     }
 
-    setFieldErrors(nextErrors);
-    return !Object.values(nextErrors).some(Boolean);
-  };
-
-  const applyBackendFieldErrors = (details) => {
-    if (!details || typeof details !== 'object') {
-      return false;
-    }
-
-    const mappedErrors = { ...emptyFieldErrors };
-    let hasMappedError = false;
-
-    Object.entries(details).forEach(([key, message]) => {
-      if (key in mappedErrors) {
-        mappedErrors[key] = String(message);
-        hasMappedError = true;
+    form.contacts.forEach((contact, index) => {
+      if (!contact.name.trim()) nextErrors.contacts[index].name = 'Name is required';
+      if (!contact.designation.trim()) nextErrors.contacts[index].designation = 'Designation is required';
+      if (!contact.email.trim()) {
+        nextErrors.contacts[index].email = 'Email is required';
+      } else if (!EMAIL_REGEX.test(contact.email.trim())) {
+        nextErrors.contacts[index].email = 'Enter a valid email address';
       }
+      if (!contact.phone.trim()) nextErrors.contacts[index].phone = 'Phone is required';
     });
 
-    if (hasMappedError) {
-      setFieldErrors(mappedErrors);
+    setFieldErrors(nextErrors);
+
+    const rootHasErrors = Object.entries(nextErrors)
+      .filter(([key]) => key !== 'contacts')
+      .some(([, value]) => Boolean(value));
+    const contactHasErrors = nextErrors.contacts.some((c) => Object.values(c).some(Boolean));
+    return !(rootHasErrors || contactHasErrors);
+  };
+
+  const lookupGst = async () => {
+    setError('');
+    setGstStatus(null);
+    setFieldErrors((prev) => ({ ...prev, gstNo: '', companyName: '', registeredAddress: '' }));
+    if (!form.gstNo.trim()) {
+      setFieldErrors((prev) => ({ ...prev, gstNo: 'GST number is required' }));
+      return;
     }
 
-    return hasMappedError;
+    try {
+      setGstLoading(true);
+      const res = await api.get('/api/auth/vendor/gst-lookup', { params: { gstNo: form.gstNo.trim() } });
+      setForm((prev) => ({
+        ...prev,
+        gstNo: res.data.gstNo || prev.gstNo,
+        companyName: res.data.companyName || '',
+        registeredAddress: res.data.registeredAddress || '',
+      }));
+      setGstStatus({
+        status: res.data.gstStatus || '',
+        active: Boolean(res.data.gstActive),
+      });
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to fetch GST details');
+      setForm((prev) => ({ ...prev, companyName: '', registeredAddress: '' }));
+      setGstStatus(null);
+    } finally {
+      setGstLoading(false);
+    }
   };
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    setFieldErrors(emptyFieldErrors);
 
     if (!validateForm()) {
       setError('Please fix the highlighted fields.');
@@ -123,202 +168,319 @@ export default function VendorRegistrationPage() {
       setLoading(true);
       await api.post('/api/auth/vendor/register', {
         name: form.name.trim(),
-        companyName: form.companyName.trim(),
-        mobileNo: form.mobileNo.trim(),
+        gstNo: form.gstNo.trim(),
+        officeAddress: form.officeAddress.trim(),
         email: form.email.trim(),
         password: form.password,
+        contactPersons: form.contacts.map((contact) => ({
+          name: contact.name.trim(),
+          designation: contact.designation.trim(),
+          email: contact.email.trim(),
+          phone: contact.phone.trim(),
+        })),
       });
-      setSuccess('Registration successful. Please check your email and activate your account.');
+
+      setSuccess('Registration request submitted. Admin approval is required before login is enabled.');
       setForm({
         name: '',
+        gstNo: '',
         companyName: '',
-        mobileNo: '',
+        registeredAddress: '',
+        officeAddress: '',
         email: '',
         password: '',
         confirmPassword: '',
+        contacts: [{ ...emptyContact }, { ...emptyContact }, { ...emptyContact }],
       });
+      setGstStatus(null);
       setFieldErrors(emptyFieldErrors);
     } catch (err) {
-      const backendDetails = err?.response?.data?.details;
-      const hasFieldErrors = applyBackendFieldErrors(backendDetails);
-      if (hasFieldErrors) {
-        setError('Please fix the highlighted fields.');
-      } else {
-        setError(err?.response?.data?.message || 'Vendor registration failed');
-      }
+      setError(err?.response?.data?.message || 'Vendor registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 0 }, maxWidth: 1000, width: '100%', background: 'white', borderRadius: { xs: '16px', md: '24px' }, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)' }}>
-        {/* Left Side - Welcome Section (Light background for visibility) */}
-        <Box sx={{ background: '#f8faf6', color: '#1f2937', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', p: { xs: 3, md: 4 }, position: 'relative', overflow: 'hidden', display: { xs: 'none', md: 'flex' } }}>
-          {/* Decorative Wave */}
-          <Box sx={{ position: 'absolute', bottom: 0, right: -50, width: 300, height: 300, background: 'rgba(21, 128, 61, 0.05)', borderRadius: '50%' }} />
-          <Box sx={{ position: 'absolute', top: -100, right: -100, width: 250, height: 250, background: 'rgba(21, 128, 61, 0.03)', borderRadius: '50%' }} />
-          
-          <Box sx={{ textAlign: 'center', zIndex: 1 }}>
-            <Box component="img" src={logo} alt="Logo" sx={{ height: 80, mb: 3 }} />
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: '#15803d' }}>
-              Join Us!
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#6b7280', lineHeight: 1.6 }}>
-              Register as a vendor and start managing your trades with Pawfect Trades
-            </Typography>
-          </Box>
-        </Box>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        py: { xs: 2, md: 4 },
+        px: 2,
+        background:
+          'radial-gradient(circle at 10% 10%, #f2fff6 0%, #dff6e9 40%, #cbeedb 100%)',
+      }}
+    >
+      <Container maxWidth="lg" disableGutters>
+        <Card
+          sx={{
+            borderRadius: 4,
+            overflow: 'hidden',
+            border: '1px solid rgba(20, 99, 56, 0.12)',
+            boxShadow: '0 24px 60px rgba(16, 72, 34, 0.16)',
+          }}
+        >
+          <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Stack spacing={2} sx={{ position: { md: 'sticky' }, top: { md: 24 } }}>
+                  <Box
+                    component="img"
+                    src={logo}
+                    alt="Pawfect Foods"
+                    sx={{ width: 160, maxWidth: '100%' }}
+                  />
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: '#155c37' }}>
+                    Vendor Registration
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: '#2c523d' }}>
+                    All fields are mandatory. Fetch GST details first to auto-fill company and
+                    registered address.
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: '1px solid rgba(21, 92, 55, 0.2)',
+                      backgroundColor: 'rgba(239, 252, 244, 0.85)',
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ color: '#155c37', fontWeight: 700 }}>
+                      Approval Flow
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5, color: '#3f644f' }}>
+                      Request submission, executive review, and admin final approval.
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Grid>
 
-        {/* Right Side - Registration Form (Green background) */}
-        <Box sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxHeight: { xs: 'auto', md: '90vh' }, overflowY: { xs: 'auto', md: 'auto' }, background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' }}>
-          <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'center', mb: 2 }}>
-            <Box component="img" src={logo} alt="Logo" sx={{ height: 60 }} />
-          </Box>
-          
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#15803d', textAlign: { xs: 'center', md: 'left' } }}>
-            Register
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#555', mb: 3, textAlign: { xs: 'center', md: 'left' } }}>
-            Create your vendor account
-          </Typography>
+              <Grid item xs={12} md={8}>
+                <Stack component="form" onSubmit={submit} spacing={2.5}>
+                  {error && <Alert severity="error">{error}</Alert>}
+                  {success && <Alert severity="success">{success}</Alert>}
 
-          <Stack component="form" spacing={2} onSubmit={submit}>
-            {error && <Alert severity="error">{error}</Alert>}
-            {success && <Alert severity="success">{success}</Alert>}
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#144f35' }}>
+                    Basic Details
+                  </Typography>
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <TextField
-                label="Full Name"
-                value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                fullWidth
-                required
-                error={Boolean(fieldErrors.name)}
-                helperText={fieldErrors.name}
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: '#d1fae5' },
-                    '&:hover fieldset': { borderColor: '#15803d' },
-                    '&.Mui-focused fieldset': { borderColor: '#15803d', borderWidth: '2px' },
-                  },
-                }}
-              />
-              <TextField
-                label="Company Name"
-                value={form.companyName}
-                onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))}
-                fullWidth
-                required
-                error={Boolean(fieldErrors.companyName)}
-                helperText={fieldErrors.companyName}
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: '#d1fae5' },
-                    '&:hover fieldset': { borderColor: '#15803d' },
-                    '&.Mui-focused fieldset': { borderColor: '#15803d', borderWidth: '2px' },
-                  },
-                }}
-              />
-            </Stack>
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                    <TextField
+                      label="Vendor Name"
+                      value={form.name}
+                      onChange={(e) => setFieldValue('name', e.target.value)}
+                      error={Boolean(fieldErrors.name)}
+                      helperText={fieldErrors.name}
+                      fullWidth
+                      required
+                    />
+                    <TextField
+                      label="Email"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setFieldValue('email', e.target.value)}
+                      error={Boolean(fieldErrors.email)}
+                      helperText={fieldErrors.email}
+                      fullWidth
+                      required
+                    />
+                  </Stack>
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <TextField
-                label="Mobile Number"
-                value={form.mobileNo}
-                onChange={(e) => setForm((p) => ({ ...p, mobileNo: e.target.value }))}
-                fullWidth
-                required
-                error={Boolean(fieldErrors.mobileNo)}
-                helperText={fieldErrors.mobileNo}
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: '#d1fae5' },
-                    '&:hover fieldset': { borderColor: '#15803d' },
-                    '&.Mui-focused fieldset': { borderColor: '#15803d', borderWidth: '2px' },
-                  },
-                }}
-              />
-              <TextField
-                label="Email"
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                fullWidth
-                required
-                error={Boolean(fieldErrors.email)}
-                helperText={fieldErrors.email}
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: '#d1fae5' },
-                    '&:hover fieldset': { borderColor: '#15803d' },
-                    '&.Mui-focused fieldset': { borderColor: '#15803d', borderWidth: '2px' },
-                  },
-                }}
-              />
-            </Stack>
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'flex-start' }}>
+                    <TextField
+                      label="GST Number"
+                      value={form.gstNo}
+                      onChange={(e) => setFieldValue('gstNo', e.target.value.toUpperCase())}
+                      error={Boolean(fieldErrors.gstNo)}
+                      helperText={fieldErrors.gstNo || 'Format: 15 character GSTIN'}
+                      inputProps={{ maxLength: 15 }}
+                      fullWidth
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={lookupGst}
+                      disabled={gstLoading}
+                      variant="outlined"
+                      sx={{ minWidth: { md: 190 }, height: 56 }}
+                    >
+                      {gstLoading ? 'Fetching...' : 'Fetch GST Details'}
+                    </Button>
+                  </Stack>
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <TextField
-                label="Password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                fullWidth
-                required
-                error={Boolean(fieldErrors.password)}
-                helperText={fieldErrors.password}
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: '#d1fae5' },
-                    '&:hover fieldset': { borderColor: '#15803d' },
-                    '&.Mui-focused fieldset': { borderColor: '#15803d', borderWidth: '2px' },
-                  },
-                }}
-              />
-              <TextField
-                label="Confirm Password"
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))}
-                fullWidth
-                required
-                error={Boolean(fieldErrors.confirmPassword)}
-                helperText={fieldErrors.confirmPassword}
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': { borderColor: '#d1fae5' },
-                    '&:hover fieldset': { borderColor: '#15803d' },
-                    '&.Mui-focused fieldset': { borderColor: '#15803d', borderWidth: '2px' },
-                  },
-                }}
-              />
-            </Stack>
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                    <TextField
+                      label="Company Name (Auto)"
+                      value={form.companyName}
+                      fullWidth
+                      disabled
+                      InputProps={{
+                        readOnly: true,
+                        startAdornment: <InputAdornment position="start">Auto</InputAdornment>,
+                      }}
+                      error={Boolean(fieldErrors.companyName)}
+                      helperText={fieldErrors.companyName}
+                      required
+                    />
+                    <TextField
+                      label="Registered Address (Auto)"
+                      value={form.registeredAddress}
+                      fullWidth
+                      disabled
+                      InputProps={{
+                        readOnly: true,
+                        startAdornment: <InputAdornment position="start">Auto</InputAdornment>,
+                      }}
+                      error={Boolean(fieldErrors.registeredAddress)}
+                      helperText={fieldErrors.registeredAddress}
+                      required
+                    />
+                  </Stack>
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 1 }}>
-              <Button type="submit" variant="contained" size="large" fullWidth disabled={loading} sx={{ background: loading ? 'rgba(58, 138, 58, 0.5)' : 'linear-gradient(135deg, #3a8a3a 0%, #428a42 100%)', boxShadow: '0 4px 12px rgba(58, 138, 58, 0.3)', py: 1.5, fontWeight: 700, transition: 'all 0.3s ease', '&:hover': loading ? {} : { boxShadow: '0 6px 16px rgba(58, 138, 58, 0.4)', transform: 'translateY(-2px)' } }}>
-                {loading ? 'Registering...' : 'Register Vendor'}
-              </Button>
-            </Stack>
+                  {gstStatus && (
+                    <Alert severity={gstStatus.active ? 'success' : 'warning'}>
+                      GST Status: {gstStatus.status || (gstStatus.active ? 'Active' : 'Not Active')} ({gstStatus.active ? 'Active' : 'Not Active'})
+                    </Alert>
+                  )}
 
-            <Stack spacing={1} sx={{ mt: 2, textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ color: '#555' }}>
-                Already have an account?{' '}
-                <Link to="/login" style={{ color: '#15803d', textDecoration: 'none', fontWeight: 600 }}>
-                  Back to Login
-                </Link>
-              </Typography>
-            </Stack>
-          </Stack>
-        </Box>
-      </Box>
+                  <TextField
+                    label="Office Address"
+                    value={form.officeAddress}
+                    onChange={(e) => setFieldValue('officeAddress', e.target.value)}
+                    error={Boolean(fieldErrors.officeAddress)}
+                    helperText={fieldErrors.officeAddress}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    required
+                  />
+
+                  <Divider />
+
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#144f35' }}>
+                    Contact Persons (3 Mandatory)
+                  </Typography>
+
+                  {form.contacts.map((contact, index) => (
+                    <Stack
+                      key={`contact-${index}`}
+                      spacing={1.5}
+                      sx={{
+                        p: { xs: 1.5, md: 2 },
+                        borderRadius: 2,
+                        border: '1px solid rgba(28, 110, 63, 0.15)',
+                        backgroundColor: '#f5fbf7',
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ color: '#2f5a42', fontWeight: 700 }}>
+                        Contact Person {index + 1}
+                      </Typography>
+
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+                        <TextField
+                          label="Name"
+                          value={contact.name}
+                          onChange={(e) => setContact(index, 'name', e.target.value)}
+                          error={Boolean(fieldErrors.contacts[index]?.name)}
+                          helperText={fieldErrors.contacts[index]?.name}
+                          fullWidth
+                          required
+                        />
+                        <TextField
+                          label="Designation"
+                          value={contact.designation}
+                          onChange={(e) => setContact(index, 'designation', e.target.value)}
+                          error={Boolean(fieldErrors.contacts[index]?.designation)}
+                          helperText={fieldErrors.contacts[index]?.designation}
+                          fullWidth
+                          required
+                        />
+                      </Stack>
+
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+                        <TextField
+                          label="Email"
+                          type="email"
+                          value={contact.email}
+                          onChange={(e) => setContact(index, 'email', e.target.value)}
+                          error={Boolean(fieldErrors.contacts[index]?.email)}
+                          helperText={fieldErrors.contacts[index]?.email}
+                          fullWidth
+                          required
+                        />
+                        <TextField
+                          label="Phone"
+                          type="tel"
+                          value={contact.phone}
+                          onChange={(e) => setContact(index, 'phone', e.target.value)}
+                          error={Boolean(fieldErrors.contacts[index]?.phone)}
+                          helperText={fieldErrors.contacts[index]?.phone}
+                          fullWidth
+                          required
+                        />
+                      </Stack>
+                    </Stack>
+                  ))}
+
+                  <Divider />
+
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#144f35' }}>
+                    Account Credentials
+                  </Typography>
+
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                    <TextField
+                      label="Password"
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setFieldValue('password', e.target.value)}
+                      error={Boolean(fieldErrors.password)}
+                      helperText={fieldErrors.password || 'Use 8 to 100 characters'}
+                      fullWidth
+                      required
+                    />
+                    <TextField
+                      label="Confirm Password"
+                      type="password"
+                      value={form.confirmPassword}
+                      onChange={(e) => setFieldValue('confirmPassword', e.target.value)}
+                      error={Boolean(fieldErrors.confirmPassword)}
+                      helperText={fieldErrors.confirmPassword}
+                      fullWidth
+                      required
+                    />
+                  </Stack>
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={loading}
+                    sx={{
+                      mt: 0.5,
+                      py: 1.5,
+                      fontWeight: 700,
+                      backgroundColor: '#207644',
+                      '&:hover': { backgroundColor: '#155c37' },
+                    }}
+                  >
+                    {loading ? 'Submitting...' : 'Submit Registration Request'}
+                  </Button>
+
+                  <Typography variant="body2" sx={{ color: '#355d48', textAlign: 'center' }}>
+                    Already have an account?{' '}
+                    <Link
+                      to="/login"
+                      style={{ color: '#0f5f3d', fontWeight: 700, textDecoration: 'none' }}
+                    >
+                      Back to Login
+                    </Link>
+                  </Typography>
+                </Stack>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      </Container>
     </Box>
   );
 }

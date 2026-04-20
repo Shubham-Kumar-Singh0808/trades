@@ -1,7 +1,9 @@
 package com.pawfectfoods.trades.service;
 
 import com.pawfectfoods.trades.dto.AuthResponse;
+import com.pawfectfoods.trades.dto.ContactPersonRequest;
 import com.pawfectfoods.trades.dto.ForgotPasswordRequest;
+import com.pawfectfoods.trades.dto.GstLookupResponse;
 import com.pawfectfoods.trades.dto.LoginRequest;
 import com.pawfectfoods.trades.dto.MessageResponse;
 import com.pawfectfoods.trades.dto.RegisterRequest;
@@ -15,6 +17,8 @@ import com.pawfectfoods.trades.model.AppUser;
 import com.pawfectfoods.trades.model.EmailVerificationToken;
 import com.pawfectfoods.trades.model.Role;
 import com.pawfectfoods.trades.model.RoleName;
+import com.pawfectfoods.trades.model.VendorContactPerson;
+import com.pawfectfoods.trades.model.VendorStatus;
 import com.pawfectfoods.trades.model.Vendor;
 import com.pawfectfoods.trades.repository.AppUserRepository;
 import com.pawfectfoods.trades.repository.EmailVerificationTokenRepository;
@@ -48,6 +52,12 @@ public class AuthService {
     private final EmailService emailService;
     private final RoleRepository roleRepository;
     private final VendorRepository vendorRepository;
+    private final GstLookupService gstLookupService;
+
+    @Transactional(readOnly = true)
+    public GstLookupResponse gstLookup(String gstNo) {
+        return gstLookupService.lookup(gstNo);
+    }
 
     @Transactional
     public MessageResponse register(RegisterRequest request) {
@@ -89,47 +99,46 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor with this email already exists");
         }
 
-        Role vendorRole = roleRepository.findByName(RoleName.VENDOR)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                "Default role VENDOR is not initialized"));
+        if (vendorRepository.existsByGstNo(request.gstNo())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor with this GST number already exists");
+        }
+
+        GstLookupResponse gstDetails = gstLookupService.lookup(request.gstNo());
 
         Vendor vendor = Vendor.builder()
             .name(request.name())
-            .companyName(request.companyName())
-            .mobileNo(request.mobileNo())
+            .companyName(gstDetails.companyName())
+            .gstNo(gstDetails.gstNo())
+            .registeredAddress(gstDetails.registeredAddress())
+            .gstStatus(gstDetails.gstStatus())
+            .gstActive(gstDetails.gstActive())
+            .officeAddress(request.officeAddress())
+            .mobileNo(request.contactPersons().get(0).phone())
             .email(request.email())
             .active(false)
+            .registrationStatus(VendorStatus.PENDING_APPROVAL)
+            .pendingPasswordHash(passwordEncoder.encode(request.password()))
             .createdAt(Instant.now())
             .build();
+
+        for (ContactPersonRequest contact : request.contactPersons()) {
+            vendor.getContactPersons().add(VendorContactPerson.builder()
+                    .vendor(vendor)
+                    .name(contact.name())
+                    .designation(contact.designation())
+                    .email(contact.email())
+                    .phone(contact.phone())
+                    .build());
+        }
+
         vendorRepository.save(vendor);
-
-        AppUser user = AppUser.builder()
-            .email(request.email())
-            .password(passwordEncoder.encode(request.password()))
-            .name(request.name())
-            .mobileNo(request.mobileNo())
-            .companyName(request.companyName())
-            .enabled(false)
-            .emailVerified(false)
-            .roles(Set.of(vendorRole))
-            .build();
-
-        AppUser savedUser = appUserRepository.save(user);
-        EmailVerificationToken token = EmailVerificationToken.builder()
-            .token(UUID.randomUUID().toString())
-            .user(savedUser)
-            .expiresAt(Instant.now().plusSeconds(24 * 60 * 60))
-            .used(false)
-            .purpose(AccountTokenPurpose.EMAIL_VERIFICATION)
-            .build();
-        tokenRepository.save(token);
-
-        emailService.sendVendorActivationEmail(savedUser.getEmail(), request.name(), token.getToken());
-        return new MessageResponse("Vendor registration successful. Check your email to activate your account.");
+        emailService.sendVendorRegistrationPendingEmail(request.email(), request.name());
+        return new MessageResponse("Vendor registration submitted successfully. Your request is pending admin approval.");
         }
 
     public AuthResponse login(LoginRequest request) {
         AppUser user = appUserRepository.findByEmail(request.email()).orElse(null);
+        EmailVerificationToken pendingAdminSetupToken = findPendingAdminSetupToken(user);
 
         if (user != null && !user.isEnabled()) {
             throw new ResponseStatusException(
@@ -137,7 +146,7 @@ public class AuthService {
                     "You are not allowed to login. Please contact the admin.");
         }
 
-        if (user != null && !user.isEmailVerified()) {
+        if (user != null && !user.isEmailVerified() && pendingAdminSetupToken == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email is not verified");
         }
 
@@ -153,12 +162,43 @@ public class AuthService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
         }
 
+        pendingAdminSetupToken = findPendingAdminSetupToken(user);
+        if (pendingAdminSetupToken != null) {
+            return new AuthResponse(
+                    null,
+                    "SETUP",
+                    pendingAdminSetupToken.getExpiresAt(),
+                    true,
+                    pendingAdminSetupToken.getToken());
+        }
+
         Instant expiresAt = Instant.now().plusMillis(jwtUtil.getExpirationMs());
         String jwt = jwtUtil.generateToken(
                 user.getEmail(),
             user.getRoles().stream().map(role -> "ROLE_" + role.getName().name()).toList());
 
-        return new AuthResponse(jwt, "Bearer", expiresAt);
+        return new AuthResponse(jwt, "Bearer", expiresAt, false, null);
+    }
+
+    private EmailVerificationToken findPendingAdminSetupToken(AppUser user) {
+        if (user == null) {
+            return null;
+        }
+
+        EmailVerificationToken token = tokenRepository
+                .findFirstByUserAndPurposeAndUsedFalseOrderByExpiresAtDesc(user, AccountTokenPurpose.ADMIN_USER_SETUP)
+                .orElse(null);
+
+        if (token == null) {
+            return null;
+        }
+
+        if (token.getExpiresAt().isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Temporary password expired. Please contact admin for new credentials.");
+        }
+
+        return token;
     }
 
     @Transactional
@@ -262,6 +302,11 @@ public class AuthService {
 
         AppUser user = appUserRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (user.getRoles().stream().anyMatch(r -> r.getName() == RoleName.VENDOR)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Vendor profile changes require approval. Please use vendor profile change request.");
+        }
 
         user.setName(request.name());
         user.setMobileNo(request.mobileNo());

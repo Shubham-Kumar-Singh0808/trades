@@ -23,7 +23,8 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         return User.withUsername(user.getEmail())
                 .password(user.getPassword())
-                .disabled(!user.isEnabled() || !user.isEmailVerified())
+                // Keep account-state checks in AuthService so admin temp-credential users can login for setup flow.
+                .disabled(!user.isEnabled())
                 .authorities(user.getRoles().stream()
                         .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName().name()))
                         .toList())

@@ -29,7 +29,7 @@ public class DataResetInitializer implements ApplicationRunner {
         }
 
         jdbcTemplate.execute(
-            "TRUNCATE TABLE audit_logs, email_verification_token, sub_vendor, trade, user_roles, vendor, app_user, roles CASCADE");
+            "TRUNCATE TABLE audit_logs, email_verification_token, trade, user_roles, vendor, app_user, roles CASCADE");
         log.warn("Bootstrap reset enabled: all existing data truncated from core tables.");
     }
 }

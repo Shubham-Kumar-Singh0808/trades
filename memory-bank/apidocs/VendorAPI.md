@@ -4,167 +4,119 @@ Controller: VendorController
 Base path: /api/vendors
 
 Security by endpoint:
-- ADMIN: full access
-- EXECUTIVE: create and view
-- VENDOR: view only
+- ADMIN: full access including registration approval
+- EXECUTIVE: view/create and review requests
+- VENDOR: view and submit own change requests
 
-## 1) Create Vendor
+## 1) Create Vendor (Admin/Executive)
 - Method: POST
 - Path: /api/vendors
 - Roles: ADMIN, EXECUTIVE
-- Use: Create a new vendor account profile and send password-setup email invitation.
-- Use case: Onboard a new vendor company before trade notifications.
+- Use: Internal vendor creation with invitation setup flow.
 
-Behavior notes:
-- Vendor is created as inactive until password setup is completed.
-- Backend also creates corresponding app user with VENDOR role.
-- Invitation email contains setup link to UI: `/vendor/setup-password?token=...`.
-
-Request body:
-```json
-{
-  "name": "John Vendor",
-  "companyName": "Pawfect Supplies Pvt Ltd",
-  "mobileNo": "9876543210",
-  "email": "vendor1@pawfectfoods.com"
-}
-```
-
-cURL:
-```bash
-curl -X POST "http://localhost:8080/api/vendors" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ADMIN_OR_EXECUTIVE_TOKEN>" \
-  -d '{
-    "name": "John Vendor",
-    "companyName": "Pawfect Supplies Pvt Ltd",
-    "mobileNo": "9876543210",
-    "email": "vendor1@pawfectfoods.com"
-  }'
-```
-
-## 2) Get All Vendors (Paginated)
+## 2) Get All Vendors
 - Method: GET
 - Path: /api/vendors?page=0&size=10&sort=name,asc
 - Roles: ADMIN, EXECUTIVE, VENDOR
-- Use: Fetch vendors page-by-page with sorting.
-- Supported sort fields: name, companyName, createdAt
 
-cURL:
-```bash
-curl -X GET "http://localhost:8080/api/vendors?page=0&size=10&sort=companyName,asc" \
-  -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
-```
-
-## 3) Get Vendor By ID
+## 3) Get Pending Registration Requests
 - Method: GET
-- Path: /api/vendors/{id}
-- Roles: ADMIN, EXECUTIVE, VENDOR
-- ID format: UUID
-
-cURL:
-```bash
-curl -X GET "http://localhost:8080/api/vendors/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
-  -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
-```
-
-## 4) Update Vendor
-- Method: PUT
-- Path: /api/vendors/{id}
-- Roles: ADMIN
-- Use: Modify vendor profile fields.
-
-cURL:
-```bash
-curl -X PUT "http://localhost:8080/api/vendors/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -d '{
-    "name": "Updated Vendor",
-    "companyName": "Updated Company",
-    "mobileNo": "9999999999",
-    "email": "vendor1@pawfectfoods.com"
-  }'
-```
-
-## 5) Delete Vendor
-- Method: DELETE
-- Path: /api/vendors/{id}
-- Roles: ADMIN
-- Use: Remove vendor and its sub-vendors.
-
-cURL:
-```bash
-curl -X DELETE "http://localhost:8080/api/vendors/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
-```
-
-## 6) Add SubVendor
-- Method: POST
-- Path: /api/vendors/{id}/subvendors
+- Path: /api/vendors/registration-requests
 - Roles: ADMIN, EXECUTIVE
-- Constraint: Maximum 3 sub-vendors per vendor.
+- Use: Executive/admin can review pending vendor registrations.
+
+## 4) Approve Vendor Registration
+- Method: PATCH
+- Path: /api/vendors/{id}/registration/approve
+- Roles: ADMIN
+- Use: Final approval. Activates vendor login and sends success email.
+
+## 5) Reject Vendor Registration
+- Method: PATCH
+- Path: /api/vendors/{id}/registration/reject
+- Roles: ADMIN
+- Request body (optional):
+```json
+{
+  "reason": "Documents mismatch"
+}
+```
+
+## 6) Submit Vendor Profile Change Request
+- Method: POST
+- Path: /api/vendors/me/change-request
+- Roles: VENDOR
+- Use: Vendor requests changes to profile/contact persons; changes apply only after approval.
 
 Request body:
 ```json
 {
-  "name": "Sub Vendor 1",
-  "companyName": "Sub Company",
-  "contactNo": "8888888888"
-}
-```
-
-cURL:
-```bash
-curl -X POST "http://localhost:8080/api/vendors/3fa85f64-5717-4562-b3fc-2c963f66afa6/subvendors" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ADMIN_OR_EXECUTIVE_TOKEN>" \
-  -d '{
-    "name": "Sub Vendor 1",
-    "companyName": "Sub Company",
-    "contactNo": "8888888888"
-  }'
-```
-
-## 7) Activate Vendor
-- Method: PATCH
-- Path: /api/vendors/{id}/activate
-- Roles: ADMIN
-
-cURL:
-```bash
-curl -X PATCH "http://localhost:8080/api/vendors/3fa85f64-5717-4562-b3fc-2c963f66afa6/activate" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
-```
-
-## 8) Deactivate Vendor
-- Method: PATCH
-- Path: /api/vendors/{id}/deactivate
-- Roles: ADMIN
-
-cURL:
-```bash
-curl -X PATCH "http://localhost:8080/api/vendors/3fa85f64-5717-4562-b3fc-2c963f66afa6/deactivate" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
-```
-
-## Example VendorResponse
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "name": "John Vendor",
-  "companyName": "Pawfect Supplies Pvt Ltd",
-  "mobileNo": "9876543210",
+  "name": "Updated Vendor Name",
   "email": "vendor1@pawfectfoods.com",
-  "active": true,
-  "createdAt": "2026-04-04T14:30:00Z",
-  "subVendors": [
+  "officeAddress": "Updated office address",
+  "contactPersons": [
     {
-      "id": "7b8d6f5e-1a5b-4b83-b577-5b83a212b8a4",
-      "name": "Sub Vendor 1",
-      "companyName": "Sub Company",
-      "contactNo": "8888888888"
+      "name": "Contact One",
+      "designation": "Sales Manager",
+      "email": "c1@vendor.com",
+      "phone": "9876543210"
+    },
+    {
+      "name": "Contact Two",
+      "designation": "Operations Lead",
+      "email": "c2@vendor.com",
+      "phone": "9876543211"
+    },
+    {
+      "name": "Contact Three",
+      "designation": "Finance Head",
+      "email": "c3@vendor.com",
+      "phone": "9876543212"
     }
   ]
 }
 ```
+
+## 7) List Vendor Profile Change Requests
+- Method: GET
+- Path: /api/vendors/change-requests?status=PENDING
+- Roles: ADMIN, EXECUTIVE
+
+## 8) Approve Vendor Profile Change Request
+- Method: PATCH
+- Path: /api/vendors/change-requests/{requestId}/approve
+- Roles: ADMIN, EXECUTIVE
+- Request body (optional):
+```json
+{
+  "reason": "Approved after review"
+}
+```
+
+## 9) Reject Vendor Profile Change Request
+- Method: PATCH
+- Path: /api/vendors/change-requests/{requestId}/reject
+- Roles: ADMIN, EXECUTIVE
+- Request body (optional):
+```json
+{
+  "reason": "Need corrected contact email"
+}
+```
+
+## 10) Existing Vendor Operations
+- GET /api/vendors/{id}
+- PUT /api/vendors/{id} (ADMIN)
+- DELETE /api/vendors/{id} (ADMIN)
+- POST /api/vendors/{id}/subvendors (ADMIN, VENDOR-own)
+- PUT /api/vendors/{id}/subvendors/{subVendorId} (ADMIN, VENDOR-own)
+- PATCH /api/vendors/{id}/activate (ADMIN)
+- PATCH /api/vendors/{id}/deactivate (ADMIN)
+
+## VendorResponse fields (updated)
+- id, name, companyName
+- gstNo, registeredAddress, officeAddress
+- mobileNo, email, active
+- registrationStatus, rejectionReason, createdAt
+- contactPersons[]
+- subVendors[]

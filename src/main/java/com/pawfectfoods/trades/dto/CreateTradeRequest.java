@@ -14,6 +14,7 @@ public record CreateTradeRequest(
         @NotBlank @Size(max = 1000) String description,
         @NotNull TradeNotificationScope notificationScope,
         List<UUID> vendorIds,
-        @NotNull MultipartFile file
+        @NotNull MultipartFile jobSheetFile,
+        @NotNull MultipartFile trackingListFile
 ) {
 }

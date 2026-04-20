@@ -17,13 +17,13 @@ import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "sub_vendor")
+@Table(name = "vendor_contact_person")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SubVendor {
+public class VendorContactPerson {
 
     @Id
     @GeneratedValue
@@ -31,16 +31,19 @@ public class SubVendor {
     @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false)
-    private String name;
-
-    @Column(nullable = false)
-    private String companyName;
-
-    @Column(nullable = false)
-    private String contactNo;
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "vendor_id", nullable = false)
     private Vendor vendor;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Column(nullable = false, length = 100)
+    private String designation;
+
+    @Column(nullable = false, length = 150)
+    private String email;
+
+    @Column(nullable = false, length = 20)
+    private String phone;
 }

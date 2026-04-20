@@ -1,17 +1,15 @@
 package com.pawfectfoods.trades.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
-public record VendorRegistrationRequest(
+public record VendorProfileChangeSubmitRequest(
         @NotBlank @Size(max = 100) String name,
-        @NotBlank @Size(max = 15) String gstNo,
+        @NotBlank @Email @Size(max = 150) String email,
         @NotBlank @Size(max = 500) String officeAddress,
-        @Email @NotBlank @Size(max = 150) String email,
-        @NotBlank @Size(min = 8, max = 100) String password,
         @Valid @Size(min = 3, max = 3) List<@Valid ContactPersonRequest> contactPersons
 ) {
 }

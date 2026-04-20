@@ -1,6 +1,10 @@
 # Project Details
 
-Last updated: 2026-04-04 (Vendor + Trade modules)
+Last updated: 2026-04-20 (round-close + next-round flow, DIRECT/HOPPING mode alias)
+
+Hotfix note (2026-04-20): `tradeClosed` is now derived from `closedAt != null` in service/response mapping and is not persisted as a dedicated DB column.
+
+Terminology note (2026-04-20): user-facing `Tracking List PDF` is renamed to `Packing List PDF`; backend supports both `/tracking-list/...` and `/packing-list/...` endpoints.
 
 ## Project Overview
 - Name: trades
@@ -22,7 +26,9 @@ Last updated: 2026-04-04 (Vendor + Trade modules)
 - UUID primary keys across core tables
 - Indexed tables for faster lookup
 - Optional bootstrap data reset before default initialization
-- Vendor and SubVendor management with pagination/sorting
+- Vendor management with pagination/sorting
+- GST-based vendor registration with admin approval gate
+- Vendor profile/contact change requests requiring approval
 - Trade management with PDF upload and vendor email notifications
 - Link-based trade notification (email contains details URL, not file attachment)
 - JWT HttpOnly cookie authentication support
@@ -53,11 +59,14 @@ Last updated: 2026-04-04 (Vendor + Trade modules)
   - `ADMIN`, `EXECUTIVE`, `VENDOR`
 - `Vendor`
   - table: `vendor`
-  - fields: id (UUID), name, companyName, mobileNo, email, active, createdAt
-  - relation: one-to-many with `SubVendor` (max 3 enforced in service)
-- `SubVendor`
-  - table: `sub_vendor`
-  - fields: id (UUID), name, companyName, contactNo, vendor
+  - fields: id (UUID), name, companyName, gstNo, registeredAddress, officeAddress, mobileNo, email, active, registrationStatus, createdAt
+  - relation: one-to-many with `VendorContactPerson`
+- `VendorContactPerson`
+  - table: `vendor_contact_person`
+  - fields: id (UUID), vendor, name, designation, email, phone
+- `VendorProfileChangeRequest`
+  - table: `vendor_profile_change_request`
+  - fields: requested profile/contact values, status (`PENDING`, `APPROVED`, `REJECTED`), audit metadata
 - `Trade`
   - table: `trade`
   - fields: id (UUID), tradeId, mode, description, pdfPath, createdAt, createdBy
@@ -74,7 +83,7 @@ Last updated: 2026-04-04 (Vendor + Trade modules)
   - `/api/admin/**` -> `ROLE_ADMIN`
   - all other endpoints -> authenticated
 - Endpoint-level role controls:
-  - Vendor create/subvendor: ADMIN, EXECUTIVE
+  - Vendor create: ADMIN, EXECUTIVE
   - Vendor view: ADMIN, EXECUTIVE, VENDOR
   - Vendor update/delete/activate/deactivate: ADMIN
   - Trade create: ADMIN, EXECUTIVE
@@ -91,9 +100,11 @@ Last updated: 2026-04-04 (Vendor + Trade modules)
    - sets user `emailVerified=true` and token `used=true`
 3. Login (`/api/auth/login`)
    - authenticates credentials
-   - requires user enabled and verified
+  - requires user enabled and verified for normal accounts
+  - admin-created temporary-credential accounts can login for initial setup window (2 hours)
    - disabled user message: `You are not allowed to login. Please contact the admin.`
-   - returns JWT and expiry info
+  - normal login returns JWT and expiry info
+  - temp-credential login returns `requiresPasswordSetup=true` and setup token; user must set new password
 
 ## Error Handling
 - Global handler: `GlobalExceptionHandler` (`@RestControllerAdvice`)
@@ -141,7 +152,7 @@ Last updated: 2026-04-04 (Vendor + Trade modules)
   - action message (human-readable performed action)
   - timestamp
   - response status code
-- Includes action mapping for vendor creation, sub-vendor creation, and trade creation.
+- Includes action mapping for vendor creation and trade creation.
 
 ## Vendor Module
 - Service: `VendorService`
@@ -149,26 +160,75 @@ Last updated: 2026-04-04 (Vendor + Trade modules)
   - updateVendor
   - getVendorById
   - getAllVendors(Pageable)
-  - addSubVendor (max 3)
+  - getRegistrationRequests(Pageable)
+  - approveRegistration/rejectRegistration
+  - submitProfileChangeRequest
+  - getProfileChangeRequests(Pageable)
+  - approveProfileChangeRequest/rejectProfileChangeRequest
   - deleteVendor
   - activateVendor/deactivateVendor
 - Controller: `VendorController` (`/api/vendors`)
+  - `GET /registration-requests`: ADMIN, EXECUTIVE
+  - `PATCH /{id}/registration/approve`: ADMIN
+  - `PATCH /{id}/registration/reject`: ADMIN
+  - `POST /me/change-request`: VENDOR
+  - `GET /change-requests`: ADMIN, EXECUTIVE
+  - `PATCH /change-requests/{requestId}/approve`: ADMIN, EXECUTIVE
+  - `PATCH /change-requests/{requestId}/reject`: ADMIN, EXECUTIVE
 
 ## Trade Module
 - Service: `TradeService`
   - createTrade
+  - submitBid
+  - getTopThreeBids
+  - getBidBoard
+  - closeRound
+  - startNextRound
+  - closeBid
+  - reopenBid
   - getAllTrades(Pageable)
   - getTradeById
+  - getJobSheetPdfForView/download
+  - getTrackingListPdfForView/download
 - Controller: `TradeController` (`/api/trades`)
+- Bidding endpoints:
+  - `POST /api/trades/{id}/bids` (VENDOR)
+  - `GET /api/trades/{id}/bids/top3` (ADMIN, EXECUTIVE)
+  - `GET /api/trades/{id}/bids/board` (ADMIN, EXECUTIVE, VENDOR)
+  - `PATCH /api/trades/{id}/bids/round/close` (ADMIN, EXECUTIVE)
+  - `PATCH /api/trades/{id}/bids/next-round` (ADMIN, EXECUTIVE)
+  - `PATCH /api/trades/{id}/bids/close` (ADMIN, EXECUTIVE, final close)
+  - `PATCH /api/trades/{id}/bids/reopen` (ADMIN, EXECUTIVE, legacy alias to next round)
 - File upload handled by `FileStorageService`.
+- Trade create requires two PDFs:
+  - job sheet PDF
+  - tracking list PDF
 - On trade creation, active vendors are notified by email.
+- Bidding lifecycle:
+  - trade starts with round 1 and bidding open
+  - vendors submit/update bids per open round
+  - admin/executive see only anonymous top-3 (L1/L2/L3) during open bidding
+  - round is closed first (without final trade closure)
+  - next round is started explicitly from closed-round state
+  - on next-round email, vendors are informed of previous round L1 (for example: "L1 for round 1 is ...") and prompted to update bid for the new round via CTA
+  - final trade close sends L1 winner email and admin summary email
+  - next-round email includes the new round number, previous round number, and previous round L1 bid
+  - vendor trade list only includes tenders where vendor has participated
+- Mode compatibility:
+  - backend accepts `DIRECT` and `HOPPING` mode values from UI and maps to internal enum values
 - Notification targeting options on trade create:
   - selected vendors (`SELECTED` + `vendorIds`)
   - all active vendors (`ALL_ACTIVE`)
   - all vendors (`ALL`)
 - Trade document endpoints:
-  - `GET /api/trades/{id}/view` (inline PDF)
-  - `GET /api/trades/{id}/download` (watermarked PDF)
+  - `GET /api/trades/{id}/view` (inline job sheet PDF, backward-compatible)
+  - `GET /api/trades/{id}/download` (watermarked job sheet PDF, backward-compatible)
+  - `GET /api/trades/{id}/job-sheet/view`
+  - `GET /api/trades/{id}/job-sheet/download`
+  - `GET /api/trades/{id}/tracking-list/view` (legacy alias)
+  - `GET /api/trades/{id}/tracking-list/download` (legacy alias)
+  - `GET /api/trades/{id}/packing-list/view`
+  - `GET /api/trades/{id}/packing-list/download`
 
 ## Important Files
 - `src/main/java/com/pawfectfoods/trades/config/SecurityConfig.java`

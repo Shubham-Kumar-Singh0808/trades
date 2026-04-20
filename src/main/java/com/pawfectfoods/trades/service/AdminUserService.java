@@ -13,6 +13,7 @@ import com.pawfectfoods.trades.repository.AppUserRepository;
 import com.pawfectfoods.trades.repository.EmailVerificationTokenRepository;
 import com.pawfectfoods.trades.repository.RoleRepository;
 import com.pawfectfoods.trades.repository.VendorRepository;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -30,6 +31,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class AdminUserService {
 
+    private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final AppUserRepository appUserRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -46,12 +50,14 @@ public class AdminUserService {
 
         Set<Role> roles = resolveRoles(Set.of(request.role()));
 
+        String tempPassword = generateTempPassword();
+
         AppUser user = AppUser.builder()
                 .email(request.email())
                 .name(request.name())
                 .mobileNo(request.mobileNo())
                 .companyName(request.companyName())
-                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+            .password(passwordEncoder.encode(tempPassword))
                 .enabled(request.enabled())
                 .emailVerified(false)
                 .roles(roles)
@@ -59,7 +65,7 @@ public class AdminUserService {
 
         AppUser saved = appUserRepository.save(user);
         syncVendorForUser(saved, request.role(), request.name(), request.mobileNo(), request.companyName());
-        sendSetupInvite(saved, request.role(), request.name());
+        sendSetupInvite(saved, request.role(), request.name(), tempPassword);
         return toResponse(saved);
     }
 
@@ -167,21 +173,27 @@ public class AdminUserService {
         }
     }
 
-    private void sendSetupInvite(AppUser user, RoleName roleName, String name) {
+    private void sendSetupInvite(AppUser user, RoleName roleName, String name, String tempPassword) {
         EmailVerificationToken setupToken = EmailVerificationToken.builder()
                 .token(UUID.randomUUID().toString())
                 .user(user)
-                .expiresAt(Instant.now().plusSeconds(48 * 60 * 60))
+                .expiresAt(Instant.now().plusSeconds(2 * 60 * 60))
                 .used(false)
                 .purpose(AccountTokenPurpose.ADMIN_USER_SETUP)
                 .build();
         tokenRepository.save(setupToken);
 
-        if (roleName == RoleName.EXECUTIVE) {
-            emailService.sendExecutivePasswordSetupEmail(user.getEmail(), name, setupToken.getToken());
-        } else {
-            emailService.sendVendorPasswordSetupEmail(user.getEmail(), name, setupToken.getToken());
+        emailService.sendTemporaryCredentialsEmail(user.getEmail(), name, roleName.name(), tempPassword, setupToken.getExpiresAt());
+    }
+
+    private String generateTempPassword() {
+        int length = 10;
+        StringBuilder value = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int index = RANDOM.nextInt(TEMP_PASSWORD_CHARS.length());
+            value.append(TEMP_PASSWORD_CHARS.charAt(index));
         }
+        return value.toString();
     }
 
     private Set<Role> resolveRoles(Set<RoleName> roleNames) {

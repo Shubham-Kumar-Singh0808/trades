@@ -2,6 +2,7 @@ package com.pawfectfoods.trades.controller;
 
 import com.pawfectfoods.trades.dto.AuthResponse;
 import com.pawfectfoods.trades.dto.ForgotPasswordRequest;
+import com.pawfectfoods.trades.dto.GstLookupResponse;
 import com.pawfectfoods.trades.dto.LoginRequest;
 import com.pawfectfoods.trades.dto.MessageResponse;
 import com.pawfectfoods.trades.dto.RegisterRequest;
@@ -52,9 +53,18 @@ public class AuthenticationController {
         return ResponseEntity.ok(authService.registerVendor(request));
     }
 
+    @GetMapping("/vendor/gst-lookup")
+    public ResponseEntity<GstLookupResponse> gstLookup(@RequestParam("gstNo") String gstNo) {
+        return ResponseEntity.ok(authService.gstLookup(gstNo));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse authResponse = authService.login(request);
+
+        if (authResponse.requiresPasswordSetup()) {
+            return ResponseEntity.ok(authResponse);
+        }
 
         ResponseCookie jwtCookie = ResponseCookie.from(JwtFilter.AUTH_COOKIE_NAME, authResponse.token())
             .httpOnly(true)

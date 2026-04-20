@@ -1,5 +1,524 @@
 # Changes Log
 
+## 2026-04-20 - Next Round Email Update (Show Previous Round L1)
+
+### Backend Updates
+- Updated round-start notification flow to include previous round L1 explicitly.
+- `TradeService.startNextRound(...)` now passes:
+  - previous round number
+  - previous round L1 value (`finalL1Rate` captured before increment)
+- `EmailService.sendTradeBidReopenedNotification(...)` now sends vendor email text in this style:
+  - "L1 for round X is Y"
+  - "If you want to update your bid for round Z, click below"
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-04-20 - Tracking List Terminology Update to Packing List
+
+### Backend Updates
+- Added packing-list endpoint aliases in `TradeController` while keeping old tracking-list URLs for backward compatibility:
+  - `GET /api/trades/{id}/packing-list/view` (alias of tracking-list view)
+  - `GET /api/trades/{id}/packing-list/download` (alias of tracking-list download)
+- Updated response download/inline filenames from `tracking-list.pdf` to `packing-list.pdf`.
+
+### Frontend Updates
+- Trade create screen label changed from `Tracking List PDF` to `Packing List PDF`.
+- Trade details screen now:
+  - requests preview/download using `/packing-list/...` endpoints
+  - shows `Packing List` in button/title/error/loading text
+  - downloads as `trade-{id}-packing-list.pdf`
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-20 - Hotfix: trade_closed Column Mismatch (500 on /api/trades)
+
+### Root Cause
+- `Trade` entity had a persisted boolean field `tradeClosed`, which Hibernate mapped to `trade.trade_closed`.
+- Existing PostgreSQL schema did not contain `trade_closed`, causing SQLState `42703` (`column does not exist`) on trade reads.
+
+### Fix Applied
+- Removed persisted `tradeClosed` field from `Trade` entity.
+- Updated trade-closure checks in `TradeService` to derive closed state from `closedAt != null`.
+- Updated `TradeResponse` mapping to return `tradeClosed` as computed (`closedAt != null`) without requiring a DB column.
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-04-20 - Mode Alias + Round Close Flow Update
+
+### Backend Updates
+- `TradeMode` now accepts UI values `DIRECT` and `HOPPING` and maps them to persisted enum values (`ONLINE`, `HYBRID`).
+- Trade create notification email now displays mode as `DIRECT`/`HOPPING` instead of raw enum names.
+- Added round lifecycle controls:
+  - `PATCH /api/trades/{id}/bids/round/close` closes only the current round.
+  - `PATCH /api/trades/{id}/bids/next-round` starts a new round.
+  - `PATCH /api/trades/{id}/bids/close` now performs final trade closure only after a round is closed.
+- Added `tradeClosed` flag on `Trade` and exposed it in `TradeResponse`.
+- Added error code `TRADE_ROUND_STILL_OPEN` when trying to final-close an open round.
+
+### Email Updates
+- Round start email wording updated to reflect "new round started" and includes round number and current lowest bid.
+
+### Frontend Updates
+- Trade create form now submits mode values as `DIRECT` and `HOPPING`.
+- Trade details admin/executive actions updated:
+  - while open: `Close Round`
+  - after round close: `Start Next Round` and `Close Trade`
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-20 - Tender Bidding Lifecycle (Rounds, L1/L2/L3, Close/Reopen, Role-Based Views)
+
+### Backend Updates
+- Added persistent bid model and repository:
+  - `TradeBid` entity stores vendor bid per trade + round.
+  - `TradeBidRepository` supports leaderboard, participant, and round-history queries.
+- Extended `Trade` entity and `TradeResponse` with bidding metadata:
+  - `biddingOpen`
+  - `currentRound`
+  - `finalL1Rate`
+  - `closedAt`
+- Added bid management APIs under `/api/trades/{id}/bids`:
+  - `POST /api/trades/{id}/bids` (VENDOR) submit/update bid for current round
+  - `GET /api/trades/{id}/bids/top3` (ADMIN/EXECUTIVE) returns anonymous L1/L2/L3 board
+  - `GET /api/trades/{id}/bids/board` (ADMIN/EXECUTIVE/VENDOR) role-specific dashboard payload
+  - `PATCH /api/trades/{id}/bids/close` (ADMIN/EXECUTIVE) closes round, finalizes L1 for round, sends notifications
+  - `PATCH /api/trades/{id}/bids/reopen` (ADMIN/EXECUTIVE) opens next round and notifies participants
+- Added trade bid-specific error codes in `ErrorCode`.
+- Updated vendor trade listing behavior:
+  - vendor `GET /api/trades` now returns only trades where vendor has participated (submitted at least one bid).
+
+### Email Workflow Updates
+- Trade creation email continues to include CTA link to open trade and place bid.
+- On bid close:
+  - L1 vendor receives winner email with trade details and action prompt.
+  - admins receive final summary email containing round-wise participation, rates, and L1/L2/L3 rankings.
+- On bid reopen:
+  - participating vendors receive reopen email with current lowest bid and direct link to update bid.
+
+### Frontend Updates
+- `TradesPage` now uses session roles:
+  - create-trade action visible only to ADMIN/EXECUTIVE.
+- `TradeDetailsPage` now includes bidding dashboard:
+  - vendor: submit/update bid, see own bids, own current bid, and final L1 rate
+  - admin/executive: see anonymous L1/L2/L3 during active bidding, close/reopen controls, full bid table after closure
+  - role-specific visibility enforced in UI according to bidding state
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Vendor List 500 Fix (executive_approved Migration)
+
+### Root Cause
+- Startup schema update attempted to enforce `NOT NULL` on `vendor.executive_approved` while existing rows had null values.
+- This caused DDL error and led to unstable runtime behavior on vendor endpoints (`/api/vendors`, `/api/vendors/registration-requests`).
+
+### Fix Applied
+- Changed `Vendor.executiveApproved` from primitive `boolean` to nullable `Boolean` with default `FALSE` in model.
+- Updated executive queue filtering to include legacy rows where `executiveApproved` is `NULL`.
+- Updated service logic and response mapping to use null-safe checks (`Boolean.TRUE.equals(...)`).
+
+### Validation
+- Backend clean compile: `./mvnw.cmd clean -DskipTests compile` -> `BUILD SUCCESS`
+- Backend startup verified: application starts successfully on port `8080` without `executive_approved` null-value DDL failure.
+
+## 2026-04-19 - Executive Approval 409 Conflict Fix
+
+### Issue Addressed
+- Executive approval API (`PATCH /api/vendors/{id}/registration/approve`) was returning `409 CONFLICT`.
+
+### Root Cause
+- Executive approval flow wrote a new enum status value path that could conflict with existing DB constraints in some environments.
+
+### Fix Applied
+- Refactored executive-first approval tracking to use dedicated vendor fields instead of status transition:
+  - `executiveApproved` (boolean)
+  - `executiveApprovedAt` (timestamp)
+  - `executiveApprovedBy` (email)
+- Executive approval now keeps `registrationStatus=PENDING_APPROVAL` and marks the executive-approved flag.
+- Admin queue still includes pending registrations and can directly approve or finalize executive-reviewed ones.
+- Executive queue now shows only pending rows where `executiveApproved=false`.
+- Vendors UI final-approve label now uses `executiveApproved` flag.
+
+### Validation
+- Backend clean compile: `./mvnw.cmd clean -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Vendor Approval Retry Handling (409 Conflict Improvement)
+
+### Issue Addressed
+- Admin approval endpoint returned `409 CONFLICT` when a user with same vendor email already existed, even in retry/recovery scenarios.
+
+### Backend Update
+- Added case-insensitive user lookup method:
+  - `AppUserRepository.findFirstByEmailIgnoreCase(...)`
+- Updated `VendorService.approveRegistration(...)`:
+  - if matching user exists and has `VENDOR` role, approval now reuses and updates that user (enabled/verified/profile sync)
+  - only conflicts with non-vendor existing users remain blocked as `409`
+
+### Validation
+- Backend clean compile: `./mvnw.cmd clean -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Vendor Approval 500 Error Hardening
+
+### Issue Addressed
+- `PATCH /api/vendors/{id}/registration/approve` was returning generic `500 INTERNAL_SERVER_ERROR` in some approval scenarios.
+
+### Backend Fixes
+- Added case-insensitive user existence check in `AppUserRepository`:
+  - `existsByEmailIgnoreCase(...)`
+- Updated `VendorService.approveRegistration(...)`:
+  - uses case-insensitive pre-check before user creation
+  - catches `DataIntegrityViolationException` on user save and returns business conflict
+- Updated global exception handling:
+  - maps `DataIntegrityViolationException` to HTTP `409 CONFLICT` with `CONFLICT` error code instead of generic 500
+
+### Validation
+- Backend compile: `./mvnw.cmd clean -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Prevent Data Loss On Restart
+
+### Root Cause
+- Database rows were being removed on each restart because:
+  - `spring.jpa.hibernate.ddl-auto=create` recreated schema at startup
+  - `app.bootstrap.reset-data=true` triggered table truncation in bootstrap initializer
+
+### Fix Applied
+- Updated `application.properties`:
+  - `spring.jpa.hibernate.ddl-auto=update`
+  - `app.bootstrap.reset-data=false`
+- Updated `DataResetInitializer` truncate SQL to remove stale `sub_vendor` table reference.
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Executive First Approval + Admin Final/Direct Approval
+
+### Workflow Update
+- Updated vendor registration approval flow to support:
+  - executive first approval
+  - admin final approval after executive approval
+  - admin direct approval from pending state (without executive step)
+
+### Backend Changes
+- Added intermediate vendor status: `EXECUTIVE_APPROVED`
+- `PATCH /api/vendors/{id}/registration/approve` now allows `ADMIN` and `EXECUTIVE`
+- Service logic updated:
+  - executive approval transitions `PENDING_APPROVAL` -> `EXECUTIVE_APPROVED`
+  - admin approval transitions `PENDING_APPROVAL` or `EXECUTIVE_APPROVED` -> `APPROVED` and enables login
+- Registration request listing updated by role:
+  - admin sees both `PENDING_APPROVAL` and `EXECUTIVE_APPROVED`
+  - executive sees `PENDING_APPROVAL`
+
+### Frontend Changes (`/vendors`)
+- Approve button is no longer disabled for executive users.
+- Approve button label is role/status aware:
+  - executive: `Approve & Forward`
+  - admin on executive-approved row: `Final Approve`
+  - admin direct path: `Approve`
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Vendor Approval Email + Sub-Vendor Feature Removal
+
+### Vendor Approval Email
+- Updated vendor approval notification email to richer HTML format with direct login link.
+- `sendVendorApprovedEmail(...)` now sends a dedicated approval template to improve visibility/usability for approved vendors.
+
+### Backend Cleanup (Sub-Vendor Removed)
+- Removed sub-vendor feature from backend and database model:
+  - removed `SubVendor` entity
+  - removed `SubVendorRepository`
+  - removed `SubVendorRequest` DTO
+  - removed `/api/vendors/{id}/subvendors` create/update endpoints
+  - removed sub-vendor service logic and authorization checks from `VendorService`
+  - removed sub-vendor payload from `VendorResponse`
+  - removed stale sub-vendor audit mapping and error code
+
+### Frontend Update (`/vendors`)
+- Removed all sub-vendor management UI.
+- Added `View Contact Details` action in vendor list.
+- Added contact-details dialog that shows vendor contact persons (name/designation/email/phone).
+
+### Validation
+- Backend clean compile: `./mvnw.cmd clean -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-19 - GST Status Visibility and Read-Only GST Auto Fields
+
+### Backend Updates
+- Extended GST lookup payload and vendor persistence with status metadata:
+  - `gstStatus`
+  - `gstActive`
+- Updated mapping chain:
+  - RapidAPI response -> `GstLookupResponse`
+  - `AuthService.registerVendor(...)` -> `Vendor`
+  - `VendorResponse` -> executive/admin UI consumption
+
+### Frontend Updates
+- `VendorRegistrationPage`:
+  - company name and registered address fields are now disabled + auto-only (manual typing blocked)
+  - added GST status banner after fetch (`Active` / `Not Active`)
+- `VendorsPage` (executive/admin pending registration table):
+  - added GST Status column with active/not-active chip and raw GST status text
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-19 - GST Company Name Preference Update
+
+### Backend Behavior Update
+- Updated GST name mapping priority in `GstLookupService`:
+  - prefer `data.tradeName` as `companyName`
+  - fallback to `data.legalName` when trade name is empty
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-04-19 - GST Lookup Switched to RapidAPI
+
+### Backend Integration
+- Updated `GstLookupService` to call RapidAPI endpoint:
+  - `GET https://gst-insights-api.p.rapidapi.com/getAddressUsingGST/{gstNo}`
+- Added required headers to outgoing request:
+  - `x-rapidapi-host`
+  - `x-rapidapi-key`
+  - `Content-Type: application/json`
+- Mapped RapidAPI response fields to internal `GstLookupResponse`:
+  - `data.gstNumber` -> `gstNo`
+  - `data.legalName` (fallback `data.tradeName`) -> `companyName`
+  - `data.address.*` merged into `registeredAddress`
+- Added configuration keys in `application.properties`:
+  - `app.gst-insights.base-url`
+  - `app.gst-insights.host`
+  - `app.gst-insights.key`
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Backend tests: `./mvnw.cmd test -DskipITs` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Vendor Registration UI Refinement
+
+### Frontend UX Improvements
+- Refined layout for `vendor/register` page with clearer section hierarchy:
+  - Basic Details
+  - Contact Persons (3 mandatory)
+  - Account Credentials
+- Improved responsive behavior for mobile/tablet by reorganizing content into a structured two-column desktop layout and single-column mobile flow.
+- Added a sticky left-side context panel (desktop) with flow guidance and approval summary.
+- Enhanced field ergonomics:
+  - `type="email"` for email fields
+  - `type="tel"` for phone fields
+  - GST field `maxLength=15` and helper text
+  - Clearer helper text for password and GST auto-fetch fields
+
+### Validation
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-19 - Executive Temporary Credential Login Fix
+
+### Backend Fix
+- Updated authentication user-details mapping so temporary-credential users are not blocked by Spring Security before setup-token logic runs.
+- File updated:
+  - `src/main/java/com/pawfectfoods/trades/security/CustomUserDetailsService.java`
+- Change:
+  - User disable condition now checks only `enabled` state.
+  - Email verification gating remains enforced in `AuthService.login(...)`, which allows ADMIN_USER_SETUP flow while keeping normal unverified login blocked.
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Backend tests: `./mvnw.cmd test -DskipITs` -> `BUILD SUCCESS`
+
+## 2026-04-19 - GST-Based Vendor Registration and Approval Workflow
+
+### Backend Enhancements
+- Added GST lookup API for vendor onboarding:
+  - `GET /api/auth/vendor/gst-lookup?gstNo=...`
+- Vendor self registration now requires:
+  - `name`, `email`, `gstNo`, `officeAddress`, `password`
+  - exactly 3 mandatory contact persons (`name`, `designation`, `email`, `phone`)
+- Company name and registered address are now auto-derived from GST lookup in backend.
+- Added vendor registration lifecycle status:
+  - `PENDING_APPROVAL`, `APPROVED`, `REJECTED`
+- Added admin/executive registration review flow:
+  - `GET /api/vendors/registration-requests`
+  - `PATCH /api/vendors/{id}/registration/approve` (ADMIN)
+  - `PATCH /api/vendors/{id}/registration/reject` (ADMIN)
+- On admin approval:
+  - vendor becomes active
+  - app user account is created/enabled
+  - approval email is sent to vendor
+- Added vendor profile change request workflow (approval-based):
+  - `POST /api/vendors/me/change-request` (VENDOR)
+  - `GET /api/vendors/change-requests?status=PENDING` (ADMIN/EXECUTIVE)
+  - `PATCH /api/vendors/change-requests/{id}/approve` (ADMIN/EXECUTIVE)
+  - `PATCH /api/vendors/change-requests/{id}/reject` (ADMIN/EXECUTIVE)
+- Vendor direct update via `/api/auth/me/profile` is now blocked and requires approval workflow.
+
+### Data Model Additions
+- `Vendor` extended with GST/address/status/approval metadata.
+- Added `VendorContactPerson` model for mandatory 3 contact entries.
+- Added `VendorProfileChangeRequest` model for approval-gated vendor updates.
+
+### Frontend Enhancements
+- Rebuilt `frontend/src/pages/VendorRegistrationPage.jsx`:
+  - GST fetch button
+  - read-only company name and registered address
+  - office address field
+  - exactly 3 mandatory contact person blocks
+  - role-aligned submission messaging (pending admin approval)
+- Updated `frontend/src/pages/VendorsPage.jsx`:
+  - pending registration requests panel
+  - approve/reject actions (admin final approval)
+  - pending vendor profile change request panel with approve/reject actions
+  - existing vendor list and sub-vendor management retained
+- Updated `frontend/src/pages/ProfilePage.jsx`:
+  - vendor users now submit change requests instead of direct updates
+  - vendor profile includes office address and 3 contact persons
+  - company name/registered address shown as read-only GST-derived values
+
+### API Docs Updated
+- `memory-bank/apidocs/AuthenticationAPI.md`
+- `memory-bank/apidocs/VendorAPI.md`
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Backend tests: `./mvnw.cmd test` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-04-16 - Frontend Build Warning Cleanup
+
+### Frontend Cleanup
+- Removed duplicate `display` style keys in:
+  - `frontend/src/pages/LoginPage.jsx`
+  - `frontend/src/pages/VendorRegistrationPage.jsx`
+- This resolves Vite/esbuild duplicate object key warnings raised during production build.
+
+### Validation
+- Frontend build: `npm run build` -> `BUILD SUCCESS`
+- Remaining warning is only chunk-size advisory (non-blocking).
+
+## 2026-04-16 - Dual Trade PDFs and Temporary Credentials Setup Flow
+
+### Trade Enhancements (Backend + Frontend)
+- Trade creation now accepts two required PDF files:
+  - `jobSheetFile`
+  - `trackingListFile`
+- Backend updates:
+  - `Trade` model now stores `jobSheetPdfPath` and `trackingListPdfPath`.
+  - `CreateTradeRequest` and `TradeResponse` updated for dual PDF fields.
+  - Added dedicated document endpoints:
+    - `GET /api/trades/{id}/job-sheet/view`
+    - `GET /api/trades/{id}/job-sheet/download`
+    - `GET /api/trades/{id}/tracking-list/view`
+    - `GET /api/trades/{id}/tracking-list/download`
+  - Existing `/view` and `/download` now serve job sheet for backward compatibility.
+- Frontend updates:
+  - `TradesPage` now uploads both PDFs while creating a trade.
+  - `TradeDetailsPage` now previews and downloads both job sheet and tracking list PDFs.
+
+### Admin-Created User Temporary Credentials Flow
+- Admin create-user flow now generates a temporary alphanumeric password and emails it to the user.
+- Temporary credential validity: 2 hours.
+- Backend updates:
+  - `AdminUserService` now creates 2-hour `ADMIN_USER_SETUP` token and sends temporary credentials email.
+  - `EmailService` added temporary credentials email template with user ID (email), temp password, and expiry.
+  - `AuthService.login` now detects valid pending setup token and returns setup-required response.
+  - `AuthResponse` extended with:
+    - `requiresPasswordSetup`
+    - `setupToken`
+  - `AuthenticationController.login` skips cookie issuance when setup is required.
+- Frontend updates:
+  - `LoginPage` handles setup-required login response and redirects to:
+    - `/setup-password?token=<setupToken>`
+
+### API Docs Updated
+- `memory-bank/apidocs/TradeAPI.md`
+- `memory-bank/apidocs/AuthenticationAPI.md`
+
+## 2026-04-16 - Trade Mode Labels, Vendor Role Guard, and Sub-Vendor Management
+
+### Trade UI Updates
+- Updated trade mode labels in frontend to display business terms:
+  - `ONLINE` shown as `DIRECT`
+  - `HYBRID` shown as `HOPPING`
+- Applied to:
+  - trade creation mode dropdown
+  - trade list mode column
+  - trade details mode display
+
+### Users UI Role Restriction
+- Updated user edit flow in `frontend/src/pages/UsersPage.jsx`:
+  - Vendor users cannot have role changed in UI.
+  - Role changes are allowed only between `ADMIN` and `EXECUTIVE` for non-vendor users.
+
+### Sub-Vendor Management (Backend + Frontend)
+- Backend updates:
+  - `POST /api/vendors/{id}/subvendors` now allows `ADMIN` and `VENDOR`.
+  - Added `PUT /api/vendors/{id}/subvendors/{subVendorId}` for sub-vendor updates.
+  - Added ownership checks so vendor users can manage sub-vendors only for their own vendor record.
+  - Added repository helper `findByIdAndVendorId(...)` for scoped sub-vendor updates.
+- Frontend updates in `frontend/src/pages/VendorsPage.jsx`:
+  - Added role-aware "Manage Sub Vendors" action.
+  - Added sub-vendor dialog with list, add, and edit capabilities.
+  - Enforced max 3 sub-vendors in UI action state.
+  - Admin can manage sub-vendors across vendors.
+  - Vendor can manage sub-vendors only for own vendor row.
+
+### Routing Context Updates
+- Passed `session` from `App.jsx` to vendor and trade pages for role-aware UI behavior.
+
+## 2026-04-16 - Vendor Registration UI Validation Alignment
+
+### Frontend Validation Enhancements
+- Updated `frontend/src/pages/VendorRegistrationPage.jsx` to enforce backend-equivalent validation before submit:
+  - `name`: required, max 100
+  - `companyName`: required, max 150
+  - `mobileNo`: required, max 20
+  - `email`: required, valid email format, max 150
+  - `password`: required, min 8, max 100
+  - `confirmPassword`: required, must match password
+- Added field-level error rendering using MUI `TextField` `error` and `helperText`.
+- Added backend validation details mapping (`response.data.details`) to corresponding form fields for accurate inline error messages.
+- Added submit loading state to prevent duplicate submissions and improve UX.
+
+## 2026-04-16 - Setup Password White Screen and Bootstrap Guard
+
+### Frontend Stability Fix
+- Fixed white screen on setup-password page caused by a runtime reference error in `frontend/src/pages/VendorSetupPasswordPage.jsx`.
+- Replaced invalid `disabled` style checks with `loading` state checks in the submit button styling.
+
+### Frontend Auth Bootstrap Adjustment
+- Updated `frontend/src/App.jsx` to skip session bootstrap (`GET /api/auth/me`) on public token/auth utility routes:
+  - `/setup-password`
+  - `/vendor/setup-password`
+  - `/vendor/register`
+  - `/forgot-password`
+  - `/reset-password`
+- Result:
+  - Opening setup-password links no longer triggers unauthenticated `/api/auth/me` calls.
+  - Token-based setup pages render reliably without white-screen crash.
+
+## 2026-04-16 - Login Page Unauthorized Toast Suppression
+
+### Frontend Auth UX Fix
+- Fixed duplicate unauthorized error message on login page when no session cookie is present.
+- Added request-level global error toast suppression support in `frontend/src/api/client.js` using `suppressErrorToast` config flag.
+- Updated session bootstrap call in `frontend/src/App.jsx`:
+  - `GET /api/auth/me` now passes `{ suppressErrorToast: true }`.
+- Result:
+  - Login page no longer shows `You are not authorized to access this resource` for expected unauthenticated bootstrap checks.
+  - Prevents duplicate toast behavior often seen in React Strict Mode development renders.
+
 ## 2026-04-05 - Role-Aware User Management, Forgot Password, and Profile Updates
 
 ### Admin User Management

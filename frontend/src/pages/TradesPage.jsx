@@ -32,7 +32,7 @@ const getModeLabel = (mode) => {
   return mode;
 };
 
-export default function TradesPage() {
+export default function TradesPage({ session }) {
   const [data, setData] = useState(null);
   const [vendors, setVendors] = useState([]);
   const [error, setError] = useState('');
@@ -40,13 +40,15 @@ export default function TradesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
     tradeId: '',
-    mode: 'ONLINE',
+    mode: 'DIRECT',
     description: '',
     notificationScope: 'ALL_ACTIVE',
     vendorIds: [],
     jobSheetFile: null,
     trackingListFile: null,
   });
+  const roles = session?.roles || [];
+  const canCreateTrade = roles.includes('ADMIN') || roles.includes('EXECUTIVE');
 
   const loadTrades = async (targetPage = page) => {
     setError('');
@@ -71,15 +73,17 @@ export default function TradesPage() {
 
   useEffect(() => {
     loadTrades(1);
-    loadVendors();
-  }, []);
+    if (canCreateTrade) {
+      loadVendors();
+    }
+  }, [canCreateTrade]);
 
   const createTrade = async (e) => {
     e.preventDefault();
     setError('');
 
     if (!form.jobSheetFile || !form.trackingListFile) {
-      setError('Both Job Sheet PDF and Tracking List PDF are required.');
+      setError('Both Job Sheet PDF and Packing List PDF are required.');
       return;
     }
 
@@ -96,7 +100,7 @@ export default function TradesPage() {
       formData.append('trackingListFile', form.trackingListFile);
 
       await api.post('/api/trades', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setForm({ tradeId: '', mode: 'ONLINE', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], jobSheetFile: null, trackingListFile: null });
+      setForm({ tradeId: '', mode: 'DIRECT', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], jobSheetFile: null, trackingListFile: null });
       setCreateModalOpen(false);
       loadTrades(1);
     } catch (err) {
@@ -113,7 +117,9 @@ export default function TradesPage() {
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">Trade List</Typography>
-            <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Create Trade</Button>
+            {canCreateTrade && (
+              <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Create Trade</Button>
+            )}
           </Stack>
           <Table size="small">
             <TableHead>
@@ -153,7 +159,7 @@ export default function TradesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={createModalOpen} onClose={() => setCreateModalOpen(false)} fullWidth maxWidth="md">
+      <Dialog open={createModalOpen && canCreateTrade} onClose={() => setCreateModalOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Create Trade</DialogTitle>
         <DialogContent>
           <Stack component="form" spacing={2} sx={{ mt: 1 }} onSubmit={createTrade}>
@@ -162,8 +168,8 @@ export default function TradesPage() {
               <FormControl fullWidth>
                 <InputLabel>Mode</InputLabel>
                 <Select value={form.mode} label="Mode" onChange={(e) => setForm((p) => ({ ...p, mode: e.target.value }))}>
-                  <MenuItem value="ONLINE">DIRECT</MenuItem>
-                  <MenuItem value="HYBRID">HOPPING</MenuItem>
+                  <MenuItem value="DIRECT">DIRECT</MenuItem>
+                  <MenuItem value="HOPPING">HOPPING</MenuItem>
                 </Select>
               </FormControl>
             </Stack>
@@ -220,7 +226,7 @@ export default function TradesPage() {
             </Box>
             <Box>
               <Button component="label" variant="outlined" sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.08)', borderColor: '#3a8a3a' } }}>
-                Upload Tracking List PDF
+                Upload Packing List PDF
                 <input
                   type="file"
                   hidden

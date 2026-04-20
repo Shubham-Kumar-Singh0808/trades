@@ -3,11 +3,11 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Pagination,
   Stack,
   Table,
@@ -18,43 +18,47 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Edit as EditIcon } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 
-const emptySubVendorForm = {
-  name: '',
-  companyName: '',
-  contactNo: '',
-};
-
 export default function VendorsPage({ session }) {
   const [data, setData] = useState(null);
+  const [registrationRequests, setRegistrationRequests] = useState([]);
+  const [profileChangeRequests, setProfileChangeRequests] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [subVendorModalOpen, setSubVendorModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [subVendorForm, setSubVendorForm] = useState(emptySubVendorForm);
-  const [editingSubVendor, setEditingSubVendor] = useState(null);
-  const [subVendorError, setSubVendorError] = useState('');
-  const [subVendorSuccess, setSubVendorSuccess] = useState('');
-  const [subVendorSaving, setSubVendorSaving] = useState(false);
   const [form, setForm] = useState({ name: '', companyName: '', mobileNo: '', email: '' });
 
   const roles = session?.roles || [];
-  const sessionEmail = (session?.email || '').toLowerCase();
   const isAdmin = roles.includes('ADMIN');
   const isExecutive = roles.includes('EXECUTIVE');
-  const isVendor = roles.includes('VENDOR');
   const canCreateVendor = isAdmin || isExecutive;
+  const canReviewRequests = isAdmin || isExecutive;
 
-  const canManageSubVendors = (vendor) => {
-    if (!vendor) return false;
-    if (isAdmin) return true;
-    if (isVendor && (vendor.email || '').toLowerCase() === sessionEmail) return true;
-    return false;
+  const approveLabelFor = (row) => {
+    if (isAdmin && row?.executiveApproved) {
+      return 'Final Approve';
+    }
+    if (isExecutive && !isAdmin) {
+      return 'Approve & Forward';
+    }
+    return 'Approve';
+  };
+
+  const renderGstActiveChip = (row) => {
+    const isActive = row?.gstActive === true;
+    return (
+      <Chip
+        size="small"
+        label={isActive ? 'Active' : 'Not Active'}
+        color={isActive ? 'success' : 'default'}
+        variant={isActive ? 'filled' : 'outlined'}
+      />
+    );
   };
 
   const load = async (targetPage = page) => {
@@ -69,9 +73,28 @@ export default function VendorsPage({ session }) {
     }
   };
 
+  const loadRequests = async () => {
+    if (!canReviewRequests) return;
+
+    try {
+      const [regRes, profileRes] = await Promise.all([
+        api.get('/api/vendors/registration-requests', { params: { page: 0, size: 20, sort: 'createdAt,desc' } }),
+        api.get('/api/vendors/change-requests', { params: { status: 'PENDING', page: 0, size: 20, sort: 'requestedAt,desc' } }),
+      ]);
+      setRegistrationRequests(regRes.data?.content || []);
+      setProfileChangeRequests(profileRes.data?.content || []);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to load pending requests');
+    }
+  };
+
   useEffect(() => {
     load(1);
   }, []);
+
+  useEffect(() => {
+    loadRequests();
+  }, [canReviewRequests]);
 
   const createVendor = async (e) => {
     e.preventDefault();
@@ -88,84 +111,63 @@ export default function VendorsPage({ session }) {
     }
   };
 
-  const refreshVendorInState = (updatedVendor) => {
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        content: (prev.content || []).map((vendor) => (vendor.id === updatedVendor.id ? updatedVendor : vendor)),
-      };
-    });
-    setSelectedVendor(updatedVendor);
+  const approveRegistration = async (vendorId) => {
+    setError('');
+    setSuccess('');
+    try {
+      await api.patch(`/api/vendors/${vendorId}/registration/approve`);
+      setSuccess('Vendor registration approved and approval email sent.');
+      await Promise.all([load(page), loadRequests()]);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to approve vendor registration');
+    }
   };
 
-  const openSubVendorModal = (vendor) => {
+  const rejectRegistration = async (vendorId) => {
+    const reason = window.prompt('Enter rejection reason');
+    if (reason === null) return;
+
+    setError('');
+    setSuccess('');
+    try {
+      await api.patch(`/api/vendors/${vendorId}/registration/reject`, { reason });
+      setSuccess('Vendor registration rejected.');
+      await Promise.all([load(page), loadRequests()]);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to reject vendor registration');
+    }
+  };
+
+  const approveProfileRequest = async (requestId) => {
+    setError('');
+    setSuccess('');
+    try {
+      await api.patch(`/api/vendors/change-requests/${requestId}/approve`);
+      setSuccess('Vendor profile change approved and applied.');
+      await Promise.all([load(page), loadRequests()]);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to approve profile change request');
+    }
+  };
+
+  const rejectProfileRequest = async (requestId) => {
+    const reason = window.prompt('Enter rejection reason');
+    if (reason === null) return;
+
+    setError('');
+    setSuccess('');
+    try {
+      await api.patch(`/api/vendors/change-requests/${requestId}/reject`, { reason });
+      setSuccess('Vendor profile change request rejected.');
+      await Promise.all([load(page), loadRequests()]);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to reject profile change request');
+    }
+  };
+
+  const openContactDetails = (vendor) => {
     setSelectedVendor(vendor);
-    setSubVendorForm(emptySubVendorForm);
-    setEditingSubVendor(null);
-    setSubVendorError('');
-    setSubVendorSuccess('');
-    setSubVendorModalOpen(true);
-  };
-
-  const addSubVendor = async (e) => {
-    e.preventDefault();
-    if (!selectedVendor) return;
-
-    setSubVendorError('');
-    setSubVendorSuccess('');
-    try {
-      setSubVendorSaving(true);
-      const res = await api.post(`/api/vendors/${selectedVendor.id}/subvendors`, subVendorForm);
-      refreshVendorInState(res.data);
-      setSubVendorForm(emptySubVendorForm);
-      setSubVendorSuccess('Sub-vendor added successfully.');
-    } catch (err) {
-      setSubVendorError(err?.response?.data?.message || 'Failed to add sub-vendor');
-    } finally {
-      setSubVendorSaving(false);
-    }
-  };
-
-  const startEditSubVendor = (subVendor) => {
-    setEditingSubVendor(subVendor);
-    setSubVendorForm({
-      name: subVendor.name || '',
-      companyName: subVendor.companyName || '',
-      contactNo: subVendor.contactNo || '',
-    });
-    setSubVendorError('');
-    setSubVendorSuccess('');
-  };
-
-  const updateSubVendor = async (e) => {
-    e.preventDefault();
-    if (!selectedVendor || !editingSubVendor) return;
-
-    setSubVendorError('');
-    setSubVendorSuccess('');
-    try {
-      setSubVendorSaving(true);
-      const res = await api.put(
-        `/api/vendors/${selectedVendor.id}/subvendors/${editingSubVendor.id}`,
-        subVendorForm
-      );
-      refreshVendorInState(res.data);
-      setEditingSubVendor(null);
-      setSubVendorForm(emptySubVendorForm);
-      setSubVendorSuccess('Sub-vendor updated successfully.');
-    } catch (err) {
-      setSubVendorError(err?.response?.data?.message || 'Failed to update sub-vendor');
-    } finally {
-      setSubVendorSaving(false);
-    }
-  };
-
-  const cancelSubVendorEdit = () => {
-    setEditingSubVendor(null);
-    setSubVendorForm(emptySubVendorForm);
-    setSubVendorError('');
-    setSubVendorSuccess('');
+    setContactModalOpen(true);
   };
 
   return (
@@ -173,6 +175,126 @@ export default function VendorsPage({ session }) {
       <Typography variant="h5">Vendors</Typography>
       {error && <Alert severity="error">{error}</Alert>}
       {success && <Alert severity="success">{success}</Alert>}
+
+      {canReviewRequests && (
+        <>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>Pending Registration Requests</Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Company</TableCell>
+                    <TableCell>GST</TableCell>
+                    <TableCell>GST Status</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Office Address</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {registrationRequests.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.name}</TableCell>
+                      <TableCell>{row.companyName}</TableCell>
+                      <TableCell>{row.gstNo}</TableCell>
+                      <TableCell>
+                        <Stack spacing={0.5}>
+                          {renderGstActiveChip(row)}
+                          <Typography variant="caption" sx={{ color: '#586b5f' }}>
+                            {row.gstStatus || '-'}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{row.email}</TableCell>
+                      <TableCell>{row.officeAddress}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => approveRegistration(row.id)}
+                            sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
+                          >
+                            {approveLabelFor(row)}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={!isAdmin}
+                            onClick={() => rejectRegistration(row.id)}
+                            color="error"
+                          >
+                            Reject
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {registrationRequests.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7}>No pending vendor registrations.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>Pending Vendor Profile Change Requests</Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Vendor</TableCell>
+                    <TableCell>Requested Name</TableCell>
+                    <TableCell>Requested Email</TableCell>
+                    <TableCell>Requested Office Address</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {profileChangeRequests.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.currentName}</TableCell>
+                      <TableCell>{row.requestedName}</TableCell>
+                      <TableCell>{row.requestedEmail}</TableCell>
+                      <TableCell>{row.requestedOfficeAddress}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => approveProfileRequest(row.id)}
+                            sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => rejectProfileRequest(row.id)}
+                          >
+                            Reject
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {profileChangeRequests.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5}>No pending profile change requests.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <Card>
         <CardContent>
@@ -189,8 +311,8 @@ export default function VendorsPage({ session }) {
                 <TableCell>Company</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Mobile</TableCell>
-                <TableCell>Active</TableCell>
-                <TableCell>Sub Vendors</TableCell>
+                <TableCell>Registration Status</TableCell>
+                <TableCell>GST Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -201,17 +323,23 @@ export default function VendorsPage({ session }) {
                   <TableCell>{v.companyName}</TableCell>
                   <TableCell>{v.email}</TableCell>
                   <TableCell>{v.mobileNo}</TableCell>
-                  <TableCell>{String(v.active)}</TableCell>
-                  <TableCell>{v.subVendors?.length || 0}/3</TableCell>
+                  <TableCell>{v.registrationStatus || (v.active ? 'APPROVED' : 'INACTIVE')}</TableCell>
+                  <TableCell>
+                    <Stack spacing={0.5}>
+                      {renderGstActiveChip(v)}
+                      <Typography variant="caption" sx={{ color: '#586b5f' }}>
+                        {v.gstStatus || '-'}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
                   <TableCell>
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() => openSubVendorModal(v)}
-                      disabled={!canManageSubVendors(v)}
+                      onClick={() => openContactDetails(v)}
                       sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
                     >
-                      Manage Sub Vendors
+                      View Contact Details
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -248,107 +376,45 @@ export default function VendorsPage({ session }) {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={subVendorModalOpen} onClose={() => setSubVendorModalOpen(false)} fullWidth maxWidth="md">
+      <Dialog open={contactModalOpen} onClose={() => setContactModalOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>
-          Sub Vendors {selectedVendor ? `- ${selectedVendor.name}` : ''}
+          Contact Details {selectedVendor ? `- ${selectedVendor.name}` : ''}
         </DialogTitle>
         <DialogContent>
-          {!canManageSubVendors(selectedVendor) && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              You can manage sub-vendors only for your own vendor account.
-            </Alert>
-          )}
-
-          {subVendorError && <Alert severity="error" sx={{ mb: 2 }}>{subVendorError}</Alert>}
-          {subVendorSuccess && <Alert severity="success" sx={{ mb: 2 }}>{subVendorSuccess}</Alert>}
-
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Current sub-vendors: {selectedVendor?.subVendors?.length || 0}/3
+          <Typography variant="body2" sx={{ mb: 2, color: '#51685b' }}>
+            Primary vendor email: {selectedVendor?.email || '-'}
           </Typography>
 
-          <Table size="small" sx={{ mb: 2 }}>
+          <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell>#</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Company</TableCell>
-                <TableCell>Contact</TableCell>
-                <TableCell>Action</TableCell>
+                <TableCell>Designation</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Phone</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {(selectedVendor?.subVendors || []).map((sv) => (
-                <TableRow key={sv.id}>
-                  <TableCell>{sv.name}</TableCell>
-                  <TableCell>{sv.companyName}</TableCell>
-                  <TableCell>{sv.contactNo}</TableCell>
-                  <TableCell>
-                    {canManageSubVendors(selectedVendor) && (
-                      <IconButton size="small" onClick={() => startEditSubVendor(sv)} color="primary">
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    )}
-                  </TableCell>
+              {(selectedVendor?.contactPersons || []).map((cp, index) => (
+                <TableRow key={cp.id || `cp-${index}`}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{cp.name}</TableCell>
+                  <TableCell>{cp.designation}</TableCell>
+                  <TableCell>{cp.email}</TableCell>
+                  <TableCell>{cp.phone}</TableCell>
                 </TableRow>
               ))}
+              {(selectedVendor?.contactPersons || []).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5}>No contact persons available.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
-
-          {canManageSubVendors(selectedVendor) && (
-            <Stack
-              component="form"
-              spacing={2}
-              onSubmit={editingSubVendor ? updateSubVendor : addSubVendor}
-            >
-              <Typography variant="subtitle1">
-                {editingSubVendor ? 'Edit Sub Vendor' : 'Add Sub Vendor'}
-              </Typography>
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                <TextField
-                  label="Name"
-                  value={subVendorForm.name}
-                  onChange={(e) => setSubVendorForm((p) => ({ ...p, name: e.target.value }))}
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="Company Name"
-                  value={subVendorForm.companyName}
-                  onChange={(e) => setSubVendorForm((p) => ({ ...p, companyName: e.target.value }))}
-                  fullWidth
-                  required
-                />
-              </Stack>
-              <TextField
-                label="Contact Number"
-                value={subVendorForm.contactNo}
-                onChange={(e) => setSubVendorForm((p) => ({ ...p, contactNo: e.target.value }))}
-                fullWidth
-                required
-              />
-
-              <Stack direction="row" spacing={1}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  disabled={
-                    subVendorSaving ||
-                    (!editingSubVendor && (selectedVendor?.subVendors?.length || 0) >= 3)
-                  }
-                  sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}
-                >
-                  {subVendorSaving ? 'Saving...' : editingSubVendor ? 'Update Sub Vendor' : 'Add Sub Vendor'}
-                </Button>
-                {editingSubVendor && (
-                  <Button onClick={cancelSubVendorEdit} sx={{ color: '#666' }}>
-                    Cancel Edit
-                  </Button>
-                )}
-              </Stack>
-            </Stack>
-          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSubVendorModalOpen(false)} sx={{ color: '#666' }}>Close</Button>
+          <Button onClick={() => setContactModalOpen(false)} sx={{ color: '#666' }}>Close</Button>
         </DialogActions>
       </Dialog>
     </Stack>

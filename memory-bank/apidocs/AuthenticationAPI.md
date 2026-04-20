@@ -1,38 +1,20 @@
 # Authentication API
 
-Controller: `AuthenticationController`
-Base path: `/api/auth`
-Security: Public endpoints (no JWT required).
+Controller: AuthenticationController
+Base path: /api/auth
+Security: Public unless specified.
 
 ## 1) Register
-- Method: `POST`
-- Path: `/api/auth/register`
-- Use: Create a new user account with default role assignment and trigger email verification.
-- Common use case: New vendor self-signup flow.
-
-Request body:
-```json
-{
-  "email": "newuser@pawfectfoods.com",
-  "password": "StrongPass@123"
-}
-```
-
-cURL:
-```bash
-curl -X POST "http://localhost:8080/api/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newuser@pawfectfoods.com",
-    "password": "StrongPass@123"
-  }'
-```
+- Method: POST
+- Path: /api/auth/register
+- Use: Generic app user registration with email verification flow.
 
 ## 2) Login
-- Method: `POST`
-- Path: `/api/auth/login`
-- Use: Authenticate user credentials and set JWT in HttpOnly cookie (`TRADES_AUTH`).
-- Common use case: User signs in and uses token for secured endpoints.
+- Method: POST
+- Path: /api/auth/login
+- Use: Authenticate user credentials.
+- Normal flow: sets JWT HttpOnly cookie (TRADES_AUTH).
+- Temporary-credential flow: returns requiresPasswordSetup=true and setupToken.
 
 Request body:
 ```json
@@ -42,108 +24,95 @@ Request body:
 }
 ```
 
-cURL:
-```bash
-curl -X POST "http://localhost:8080/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@pawfectfoods.com",
-    "password": "admin@pawfectfoods"
-  }'
-```
+## 3) Vendor GST Lookup
+- Method: GET
+- Path: /api/auth/vendor/gst-lookup?gstNo={gstNo}
+- Use: Return company name and registered address from GST number.
+- Used by: Vendor registration UI autofill.
 
 Example response:
 ```json
 {
-  "token": "<JWT_TOKEN>",
-  "tokenType": "Bearer",
-  "expiresAt": "2026-04-05T06:00:00Z"
+  "gstNo": "27ABCDE1234F1Z5",
+  "companyName": "GST Registered Company ABCDE123",
+  "registeredAddress": "Registered Office, State-27, India"
 }
 ```
 
-Error response format (standardized):
-```json
-{
-  "timestamp": "2026-04-04T06:40:00Z",
-  "status": 403,
-  "error": "Forbidden",
-  "code": "AUTH_USER_DISABLED",
-  "message": "You are not allowed to login. Please contact the admin.",
-  "path": "/api/auth/login",
-  "details": {}
-}
-```
-
-Common login errors:
-- Disabled user:
-  - status: `403`
-  - code: `AUTH_USER_DISABLED`
-  - message: `You are not allowed to login. Please contact the admin.`
-- Email not verified:
-  - status: `403`
-  - code: `AUTH_EMAIL_NOT_VERIFIED`
-- Invalid credentials:
-  - status: `401`
-  - code: `AUTH_INVALID_CREDENTIALS`
-
-## 3) Vendor Self Registration
-- Method: `POST`
-- Path: `/api/auth/vendor/register`
-- Use: Vendor submits full profile details + password. Account stays inactive until email activation.
+## 4) Vendor Self Registration
+- Method: POST
+- Path: /api/auth/vendor/register
+- Use: Submit vendor onboarding request with mandatory details and exactly 3 contact persons.
+- Behavior:
+  - Company name and registered address are derived from GST lookup.
+  - Vendor request is created with PENDING_APPROVAL.
+  - Login is not enabled until admin approval.
 
 Request body:
 ```json
 {
   "name": "John Vendor",
-  "companyName": "Pawfect Supplies Pvt Ltd",
-  "mobileNo": "9876543210",
+  "gstNo": "27ABCDE1234F1Z5",
+  "officeAddress": "Plot 22, Industrial Area, Pune",
   "email": "vendor1@pawfectfoods.com",
-  "password": "StrongPass@123"
+  "password": "StrongPass@123",
+  "contactPersons": [
+    {
+      "name": "Contact One",
+      "designation": "Sales Manager",
+      "email": "c1@vendor.com",
+      "phone": "9876543210"
+    },
+    {
+      "name": "Contact Two",
+      "designation": "Operations Lead",
+      "email": "c2@vendor.com",
+      "phone": "9876543211"
+    },
+    {
+      "name": "Contact Three",
+      "designation": "Finance Head",
+      "email": "c3@vendor.com",
+      "phone": "9876543212"
+    }
+  ]
 }
 ```
 
-## 4) Verify Email
-- Method: `GET`
-- Path: `/api/auth/verify-email?token={token}`
-- Use: Activate account once user clicks verification link.
-- Common use case: Email ownership verification during onboarding.
+## 5) Verify Email
+- Method: GET
+- Path: /api/auth/verify-email?token={token}
+- Use: Email verification for token-driven flows.
 
-cURL:
-```bash
-curl -X GET "http://localhost:8080/api/auth/verify-email?token=<VERIFICATION_TOKEN>"
-```
+## 6) Activate Account (UI Redirect)
+- Method: GET
+- Path: /api/auth/activate-account?token={token}
+- Use: Verifies token and redirects to frontend login with activation status query params.
 
-## 5) Activate Account (UI Redirect)
-- Method: `GET`
-- Path: `/api/auth/activate-account?token={token}`
-- Use: Verifies token and redirects user to UI login page with activation status query param.
-- Success redirect: `http://localhost:4000/login?activation=success`
-- Failure redirect: `http://localhost:4000/login?activation=failed`
+## 7) Setup Password
+- Method: POST
+- Path: /api/auth/setup-password
+- Use: Set password for setup-token users.
 
-## 6) Vendor Setup Password
-- Method: `POST`
-- Path: `/api/auth/setup-password`
-- Use: Vendor sets initial password from email invitation (admin-created vendor flow).
+## 8) Forgot Password
+- Method: POST
+- Path: /api/auth/forgot-password
 
-Request body:
-```json
-{
-  "token": "<SETUP_TOKEN>",
-  "password": "NewStrongPass@123"
-}
-```
+## 9) Reset Password
+- Method: POST
+- Path: /api/auth/reset-password
 
-## 7) Logout
-- Method: `POST`
-- Path: `/api/auth/logout`
-- Use: Clears the auth cookie and logs out current session.
+## 10) Logout
+- Method: POST
+- Path: /api/auth/logout
 
-cURL:
-```bash
-curl -X POST "http://localhost:8080/api/auth/logout"
-```
+## 11) Current Session
+- Method: GET
+- Path: /api/auth/me
+- Security: authenticated
 
-## Notes
-- Vendor self-registration sends rich HTML activation email with CTA button.
-- Admin-created vendor onboarding sends HTML password setup email with CTA button.
-- JWT is also accepted from `Authorization: Bearer <token>`, but frontend uses HttpOnly cookie flow.
+## 12) Update Profile
+- Method: POST
+- Path: /api/auth/me/profile
+- Security: authenticated
+- Behavior: vendor users cannot directly update profile here; vendor updates must go through vendor change-request workflow.

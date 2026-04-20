@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -77,6 +78,15 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN,
                 "You are not authorized to access this resource", request.getRequestURI(), Map.of());
     }
+
+            @ExceptionHandler(DataIntegrityViolationException.class)
+            public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+                DataIntegrityViolationException ex,
+                HttpServletRequest request) {
+
+            return build(HttpStatus.CONFLICT, ErrorCode.CONFLICT,
+                "Request conflicts with existing data", request.getRequestURI(), Map.of());
+            }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneric(

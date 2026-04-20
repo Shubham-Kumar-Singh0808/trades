@@ -13,7 +13,7 @@ Security by endpoint:
 - Path: /api/trades
 - Content-Type: multipart/form-data
 - Roles: ADMIN, EXECUTIVE
-- Use: Create a trade with PDF attachment and notify all active vendors by email.
+- Use: Create a trade with two PDF attachments (job sheet + tracking list) and notify vendors by email.
 - Email sends a details URL (no file attachment).
 
 Form fields:
@@ -22,7 +22,8 @@ Form fields:
 - description (string)
 - notificationScope (SELECTED | ALL_ACTIVE | ALL)
 - vendorIds (UUID list, required only when notificationScope=SELECTED)
-- file (PDF)
+- jobSheetFile (PDF)
+- trackingListFile (PDF)
 
 cURL:
 ```bash
@@ -32,7 +33,8 @@ curl -X POST "http://localhost:8080/api/trades" \
   -F "mode=ONLINE" \
   -F "description=Sample trade for dry food imports" \
   -F "notificationScope=ALL_ACTIVE" \
-  -F "file=@D:/docs/trade.pdf;type=application/pdf"
+  -F "jobSheetFile=@D:/docs/job-sheet.pdf;type=application/pdf" \
+  -F "trackingListFile=@D:/docs/tracking-list.pdf;type=application/pdf"
 ```
 
 Create trade and notify selected vendors only:
@@ -45,7 +47,8 @@ curl -X POST "http://localhost:8080/api/trades" \
   -F "notificationScope=SELECTED" \
   -F "vendorIds=3fa85f64-5717-4562-b3fc-2c963f66afa6" \
   -F "vendorIds=7b8d6f5e-1a5b-4b83-b577-5b83a212b8a4" \
-  -F "file=@D:/docs/trade.pdf;type=application/pdf"
+  -F "jobSheetFile=@D:/docs/job-sheet.pdf;type=application/pdf" \
+  -F "trackingListFile=@D:/docs/tracking-list.pdf;type=application/pdf"
 ```
 
 Validation:
@@ -76,32 +79,55 @@ curl -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b6
   -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
 ```
 
-## 4) View Trade PDF (Inline)
+## 4) View Job Sheet PDF (Inline)
 - Method: GET
-- Path: /api/trades/{id}/view
+- Path: /api/trades/{id}/job-sheet/view
 - Roles: ADMIN, EXECUTIVE, VENDOR
 - Use: Open PDF in browser tab/viewer.
 
 cURL:
 ```bash
-curl -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b623/view" \
+curl -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b623/job-sheet/view" \
   -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
 ```
 
-## 5) Download Trade PDF (Watermarked)
+## 5) Download Job Sheet PDF (Watermarked)
 - Method: GET
-- Path: /api/trades/{id}/download
+- Path: /api/trades/{id}/job-sheet/download
 - Roles: ADMIN, EXECUTIVE, VENDOR
-- Use: Download PDF with user watermark.
+- Use: Download job sheet PDF with user watermark.
 - Watermark source:
   - if downloader email matches vendor: `vendorName | companyName`
   - otherwise: downloader email
 
 cURL:
 ```bash
-curl -L -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b623/download" \
+curl -L -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b623/job-sheet/download" \
   -H "Authorization: Bearer <ANY_ROLE_TOKEN>" \
-  --output trade.pdf
+  --output job-sheet.pdf
+```
+
+## 6) View Tracking List PDF (Inline)
+- Method: GET
+- Path: /api/trades/{id}/tracking-list/view
+- Roles: ADMIN, EXECUTIVE, VENDOR
+
+cURL:
+```bash
+curl -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b623/tracking-list/view" \
+  -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
+```
+
+## 7) Download Tracking List PDF (Watermarked)
+- Method: GET
+- Path: /api/trades/{id}/tracking-list/download
+- Roles: ADMIN, EXECUTIVE, VENDOR
+
+cURL:
+```bash
+curl -L -X GET "http://localhost:8080/api/trades/52aa2181-68a3-48c6-a5fe-cf0ee1f3b623/tracking-list/download" \
+  -H "Authorization: Bearer <ANY_ROLE_TOKEN>" \
+  --output tracking-list.pdf
 ```
 
 ## Email Notification Behavior
@@ -124,7 +150,8 @@ When a trade is created:
   "tradeId": "TRD-2026-0001",
   "mode": "ONLINE",
   "description": "Sample trade for dry food imports",
-  "pdfPath": "/uploads/trades/7abf7de4-23b6-4f6e-9a30-1b8aef77f0bc_trade.pdf",
+  "jobSheetPdfPath": "/uploads/trades/7abf7de4-23b6-4f6e-9a30-1b8aef77f0bc_job-sheet.pdf",
+  "trackingListPdfPath": "/uploads/trades/5bcf7de4-87b6-4f6e-9a30-9a8aef77a0de_tracking-list.pdf",
   "createdAt": "2026-04-04T15:00:00Z",
   "createdBy": "admin@pawfectfoods.com"
 }

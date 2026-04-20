@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,7 +52,10 @@ public class Trade {
     private String description;
 
     @Column(nullable = false)
-    private String pdfPath;
+        private String jobSheetPdfPath;
+
+        @Column(nullable = false)
+        private String trackingListPdfPath;
 
     @Column(nullable = false)
     private Instant createdAt;
@@ -59,4 +63,17 @@ public class Trade {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private AppUser createdBy;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean biddingOpen = true;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private int currentRound = 1;
+
+    private Instant closedAt;
+
+    @Column(precision = 12, scale = 4)
+    private BigDecimal finalL1Rate;
 }

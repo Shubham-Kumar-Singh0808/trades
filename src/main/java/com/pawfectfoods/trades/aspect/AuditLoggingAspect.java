@@ -94,8 +94,6 @@ public class AuditLoggingAspect {
                     "Admin fetched users list";
             case "com.pawfectfoods.trades.controller.VendorController#createVendor" ->
                     "Vendor created";
-            case "com.pawfectfoods.trades.controller.VendorController#addSubVendor" ->
-                    "Sub-vendor created";
             case "com.pawfectfoods.trades.controller.TradeController#createTrade" ->
                     "Trade created";
             default -> method + " " + endpoint + " invoked";
