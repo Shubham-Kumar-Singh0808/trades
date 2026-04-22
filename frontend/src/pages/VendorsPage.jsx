@@ -23,8 +23,6 @@ import api from '../api/client';
 
 export default function VendorsPage({ session }) {
   const [data, setData] = useState(null);
-  const [registrationRequests, setRegistrationRequests] = useState([]);
-  const [profileChangeRequests, setProfileChangeRequests] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
@@ -37,7 +35,6 @@ export default function VendorsPage({ session }) {
   const isAdmin = roles.includes('ADMIN');
   const isExecutive = roles.includes('EXECUTIVE');
   const canCreateVendor = isAdmin || isExecutive;
-  const canReviewRequests = isAdmin || isExecutive;
 
   const approveLabelFor = (row) => {
     if (isAdmin && row?.executiveApproved) {
@@ -73,28 +70,9 @@ export default function VendorsPage({ session }) {
     }
   };
 
-  const loadRequests = async () => {
-    if (!canReviewRequests) return;
-
-    try {
-      const [regRes, profileRes] = await Promise.all([
-        api.get('/api/vendors/registration-requests', { params: { page: 0, size: 20, sort: 'createdAt,desc' } }),
-        api.get('/api/vendors/change-requests', { params: { status: 'PENDING', page: 0, size: 20, sort: 'requestedAt,desc' } }),
-      ]);
-      setRegistrationRequests(regRes.data?.content || []);
-      setProfileChangeRequests(profileRes.data?.content || []);
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to load pending requests');
-    }
-  };
-
   useEffect(() => {
     load(1);
   }, []);
-
-  useEffect(() => {
-    loadRequests();
-  }, [canReviewRequests]);
 
   const createVendor = async (e) => {
     e.preventDefault();
@@ -111,59 +89,6 @@ export default function VendorsPage({ session }) {
     }
   };
 
-  const approveRegistration = async (vendorId) => {
-    setError('');
-    setSuccess('');
-    try {
-      await api.patch(`/api/vendors/${vendorId}/registration/approve`);
-      setSuccess('Vendor registration approved and approval email sent.');
-      await Promise.all([load(page), loadRequests()]);
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to approve vendor registration');
-    }
-  };
-
-  const rejectRegistration = async (vendorId) => {
-    const reason = window.prompt('Enter rejection reason');
-    if (reason === null) return;
-
-    setError('');
-    setSuccess('');
-    try {
-      await api.patch(`/api/vendors/${vendorId}/registration/reject`, { reason });
-      setSuccess('Vendor registration rejected.');
-      await Promise.all([load(page), loadRequests()]);
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to reject vendor registration');
-    }
-  };
-
-  const approveProfileRequest = async (requestId) => {
-    setError('');
-    setSuccess('');
-    try {
-      await api.patch(`/api/vendors/change-requests/${requestId}/approve`);
-      setSuccess('Vendor profile change approved and applied.');
-      await Promise.all([load(page), loadRequests()]);
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to approve profile change request');
-    }
-  };
-
-  const rejectProfileRequest = async (requestId) => {
-    const reason = window.prompt('Enter rejection reason');
-    if (reason === null) return;
-
-    setError('');
-    setSuccess('');
-    try {
-      await api.patch(`/api/vendors/change-requests/${requestId}/reject`, { reason });
-      setSuccess('Vendor profile change request rejected.');
-      await Promise.all([load(page), loadRequests()]);
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to reject profile change request');
-    }
-  };
 
   const openContactDetails = (vendor) => {
     setSelectedVendor(vendor);
@@ -172,129 +97,10 @@ export default function VendorsPage({ session }) {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h5">Vendors</Typography>
+      <Typography variant="h5">All Vendors</Typography>
       {error && <Alert severity="error">{error}</Alert>}
       {success && <Alert severity="success">{success}</Alert>}
 
-      {canReviewRequests && (
-        <>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 1.5 }}>Pending Registration Requests</Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Company</TableCell>
-                    <TableCell>GST</TableCell>
-                    <TableCell>GST Status</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Office Address</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {registrationRequests.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.companyName}</TableCell>
-                      <TableCell>{row.gstNo}</TableCell>
-                      <TableCell>
-                        <Stack spacing={0.5}>
-                          {renderGstActiveChip(row)}
-                          <Typography variant="caption" sx={{ color: '#586b5f' }}>
-                            {row.gstStatus || '-'}
-                          </Typography>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>{row.email}</TableCell>
-                      <TableCell>{row.officeAddress}</TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => approveRegistration(row.id)}
-                            sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
-                          >
-                            {approveLabelFor(row)}
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            disabled={!isAdmin}
-                            onClick={() => rejectRegistration(row.id)}
-                            color="error"
-                          >
-                            Reject
-                          </Button>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {registrationRequests.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7}>No pending vendor registrations.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 1.5 }}>Pending Vendor Profile Change Requests</Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Vendor</TableCell>
-                    <TableCell>Requested Name</TableCell>
-                    <TableCell>Requested Email</TableCell>
-                    <TableCell>Requested Office Address</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {profileChangeRequests.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{row.currentName}</TableCell>
-                      <TableCell>{row.requestedName}</TableCell>
-                      <TableCell>{row.requestedEmail}</TableCell>
-                      <TableCell>{row.requestedOfficeAddress}</TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => approveProfileRequest(row.id)}
-                            sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            onClick={() => rejectProfileRequest(row.id)}
-                          >
-                            Reject
-                          </Button>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {profileChangeRequests.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5}>No pending profile change requests.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </>
-      )}
 
       <Card>
         <CardContent>
@@ -328,7 +134,7 @@ export default function VendorsPage({ session }) {
                     <Stack spacing={0.5}>
                       {renderGstActiveChip(v)}
                       <Typography variant="caption" sx={{ color: '#586b5f' }}>
-                        {v.gstStatus || '-'}
+                     
                       </Typography>
                     </Stack>
                   </TableCell>
@@ -339,7 +145,7 @@ export default function VendorsPage({ session }) {
                       onClick={() => openContactDetails(v)}
                       sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
                     >
-                      View Contact Details
+                      View Details
                     </Button>
                   </TableCell>
                 </TableRow>
