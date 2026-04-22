@@ -1,5 +1,19 @@
 # Changes Log
 
+## 2026-04-22 - Fix: HOPPING Mode Validation + Vendor /api/trades 500
+
+### Issues
+- `POST /api/trades` with multipart form failed validation for mode value `HOPPING`.
+- Vendor `GET /api/trades` could fail with `500` when pageable sorting (`createdAt`) was applied on a `TradeBid`-root query.
+
+### Backend Fixes
+- Added web conversion component: `TradeModeConverter` to map form string values (`DIRECT`, `HOPPING`, etc.) through `TradeMode.fromValue(...)` during `@ModelAttribute` binding.
+- Moved vendor trade pagination query to `TradeRepository` (Trade-root JPQL with `exists` subquery) so pageable sorting by trade fields works reliably.
+- Updated `TradeService.getAllTrades(...)` vendor path to use the new `TradeRepository.findDistinctByVendorId(...)`.
+
+### Validation
+- Backend clean compile: `./mvnw.cmd clean -DskipTests compile` -> `BUILD SUCCESS`
+
 ## 2026-04-20 - Next Round Email Update (Show Previous Round L1)
 
 ### Backend Updates

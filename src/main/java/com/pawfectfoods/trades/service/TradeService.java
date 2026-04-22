@@ -360,7 +360,7 @@ public class TradeService {
         AppUser currentUser = resolveCurrentUser();
         if (hasRole(currentUser, RoleName.VENDOR)) {
             Vendor vendor = resolveCurrentVendor();
-            return tradeBidRepository.findDistinctTradesByVendorId(vendor.getId(), pageable).map(this::toResponse);
+            return tradeRepository.findDistinctByVendorId(vendor.getId(), pageable).map(this::toResponse);
         }
         return tradeRepository.findAll(pageable).map(this::toResponse);
     }

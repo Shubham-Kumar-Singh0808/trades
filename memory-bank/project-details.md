@@ -6,6 +6,10 @@ Hotfix note (2026-04-20): `tradeClosed` is now derived from `closedAt != null` i
 
 Terminology note (2026-04-20): user-facing `Tracking List PDF` is renamed to `Packing List PDF`; backend supports both `/tracking-list/...` and `/packing-list/...` endpoints.
 
+Binding/query note (2026-04-22):
+- Trade mode form binding supports UI aliases like `DIRECT` and `HOPPING` via `TradeModeConverter`.
+- Vendor trade listing uses a `Trade`-root pageable query (`TradeRepository.findDistinctByVendorId`) to avoid sorting errors on bid-root queries.
+
 ## Project Overview
 - Name: trades
 - Language: Java 17
