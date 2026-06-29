@@ -60,6 +60,9 @@ public class Trade {
     @Column(nullable = false)
     private Instant createdAt;
 
+    @Column(nullable = true)
+    private Instant autoCloseAt;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private AppUser createdBy;

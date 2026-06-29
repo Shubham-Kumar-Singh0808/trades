@@ -22,6 +22,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
@@ -37,6 +39,9 @@ export default function TradesPage({ session }) {
   const [vendors, setVendors] = useState([]);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [modeFilter, setModeFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
     tradeId: '',
@@ -49,13 +54,29 @@ export default function TradesPage({ session }) {
   });
   const roles = session?.roles || [];
   const canCreateTrade = roles.includes('ADMIN') || roles.includes('EXECUTIVE');
+  const theme = useTheme();
+  const isSm = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const loadTrades = async (targetPage = page) => {
+  const loadTrades = async (targetPage = page, filters = {}) => {
     setError('');
     try {
-      const res = await api.get('/api/trades', {
-        params: { page: targetPage - 1, size: 10, sort: 'createdAt,desc' },
-      });
+      const params = { page: targetPage - 1, size: 10, sort: 'createdAt,desc' };
+      if (filters.query !== undefined) {
+        if (filters.query.trim()) params.query = filters.query.trim();
+      } else if (query.trim()) {
+        params.query = query.trim();
+      }
+      if (filters.mode !== undefined) {
+        if (filters.mode !== 'ALL') params.mode = filters.mode;
+      } else if (modeFilter !== 'ALL') {
+        params.mode = modeFilter;
+      }
+      if (filters.status !== undefined) {
+        if (filters.status !== 'ALL') params.status = filters.status;
+      } else if (statusFilter !== 'ALL') {
+        params.status = statusFilter;
+      }
+      const res = await api.get('/api/trades', { params });
       setData(res.data);
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load trades');
@@ -77,6 +98,19 @@ export default function TradesPage({ session }) {
       loadVendors();
     }
   }, [canCreateTrade]);
+
+  const applyFilters = async () => {
+    setPage(1);
+    await loadTrades(1);
+  };
+
+  const resetFilters = async () => {
+    setQuery('');
+    setModeFilter('ALL');
+    setStatusFilter('ALL');
+    setPage(1);
+    await loadTrades(1, { query: '', mode: 'ALL', status: 'ALL' });
+  };
 
   const createTrade = async (e) => {
     e.preventDefault();
@@ -115,36 +149,107 @@ export default function TradesPage({ session }) {
 
       <Card>
         <CardContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Stack direction="row" flexWrap="wrap" alignItems="center" sx={{ mb: 2, width: '100%' }}>
             <Typography variant="h6">Trade List</Typography>
             {canCreateTrade && (
-              <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Create Trade</Button>
+              <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ ml: 'auto', backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Create Trade</Button>
             )}
           </Stack>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Trade ID</TableCell>
-                <TableCell>Mode</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Created By</TableCell>
-                <TableCell>Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
+            <TextField
+              label="Search trades"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  applyFilters();
+                }
+              }}
+              fullWidth
+              helperText="Search by trade ID, description, or creator."
+            />
+            <FormControl fullWidth>
+              <InputLabel>Mode</InputLabel>
+              <Select value={modeFilter} label="Mode" onChange={(e) => setModeFilter(e.target.value)}>
+                <MenuItem value="ALL">All Modes</MenuItem>
+                <MenuItem value="DIRECT">DIRECT</MenuItem>
+                <MenuItem value="HOPPING">HOPPING</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
+                <MenuItem value="ALL">All Statuses</MenuItem>
+                <MenuItem value="OPEN">Open</MenuItem>
+                <MenuItem value="ROUND_CLOSED">Round Closed</MenuItem>
+                <MenuItem value="FINALIZED">Finalized</MenuItem>
+              </Select>
+            </FormControl>
+            <Stack direction="row" spacing={1} sx={{ alignSelf: { xs: 'stretch', md: 'center' } }}>
+              <Button variant="contained" onClick={applyFilters} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>
+                Apply
+              </Button>
+              <Button variant="outlined" onClick={resetFilters}>
+                Reset
+              </Button>
+            </Stack>
+          </Stack>
+
+          {isSm ? (
+            <Stack spacing={1}>
               {data?.content?.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell>{t.tradeId}</TableCell>
-                  <TableCell>{getModeLabel(t.mode)}</TableCell>
-                  <TableCell>{t.description}</TableCell>
-                  <TableCell>{t.createdBy}</TableCell>
-                  <TableCell>
-                    <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
-                  </TableCell>
-                </TableRow>
+                <Card key={t.id} variant="outlined">
+                  <CardContent>
+                    <Stack spacing={1}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle1">{t.tradeId}</Typography>
+                        <Typography variant="caption" color="text.secondary">{getModeLabel(t.mode)}</Typography>
+                      </Stack>
+                      <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{t.description}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Round {t.currentRound} {t.tradeClosed ? '• Finalized' : t.biddingOpen ? '• Open' : '• Closed'}
+                      </Typography>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="caption" color="text.secondary">{t.createdBy}</Typography>
+                        <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
+            </Stack>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Trade ID</TableCell>
+                  <TableCell>Mode</TableCell>
+                  <TableCell>Round</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Created By</TableCell>
+                  <TableCell>Details</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data?.content?.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>{t.tradeId}</TableCell>
+                    <TableCell>{getModeLabel(t.mode)}</TableCell>
+                    <TableCell>{t.currentRound}</TableCell>
+                    <TableCell>{t.tradeClosed ? 'Finalized' : t.biddingOpen ? 'Open' : 'Closed'}</TableCell>
+                    <TableCell sx={{ maxWidth: 400, wordBreak: 'break-word' }}>{t.description}</TableCell>
+                    <TableCell>{t.createdBy}</TableCell>
+                    <TableCell>
+                      <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
           {!!data && (
             <Pagination
               sx={{ mt: 2 }}

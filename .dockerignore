@@ -1,0 +1,10 @@
+.git
+.gitignore
+.idea
+.vscode
+.mvn
+.venv
+**/node_modules
+frontend/dist
+target
+uploads

@@ -160,13 +160,13 @@ export default function ProfilePage({ session, onSessionRefresh }) {
             {isVendor && (
               <>
                 <TextField
-                  label="Company Name (GST Auto)"
+                  label="Company Name"
                   value={form.companyName}
                   fullWidth
                   InputProps={{ readOnly: true }}
                 />
                 <TextField
-                  label="Registered Address (GST Auto)"
+                  label="Registered Address"
                   value={form.registeredAddress}
                   fullWidth
                   InputProps={{ readOnly: true }}

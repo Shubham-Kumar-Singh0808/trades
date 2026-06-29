@@ -5,7 +5,7 @@ import api from '../api/client';
 import logo from '../assets/images/logo.png';
 
 export default function LoginPage({ onLoginSuccess }) {
-  const [form, setForm] = useState({ email: 'admin@pawfectfoods.com', password: 'admin@pawfectfoods' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [toastSeverity, setToastSeverity] = useState('success');

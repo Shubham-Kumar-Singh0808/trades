@@ -22,6 +22,10 @@ import com.pawfectfoods.trades.repository.TradeRepository;
 import com.pawfectfoods.trades.repository.VendorRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -56,6 +60,12 @@ public class TradeService {
     @Value("${app.frontend.base-url:http://localhost:4000}")
     private String frontendBaseUrl;
 
+    @Value("${app.trade.auto-close-zone:Asia/Kolkata}")
+    private String tradeAutoCloseZone;
+
+    @Value("${app.trade.auto-close-hour:10}")
+    private int tradeAutoCloseHour;
+
     @Transactional
     public TradeResponse createTrade(CreateTradeRequest request) {
         if (tradeRepository.existsByTradeId(request.tradeId())) {
@@ -67,18 +77,20 @@ public class TradeService {
         String trackingListPdfPath = fileStorageService.saveFile(request.trackingListFile());
         AppUser createdBy = resolveCurrentUser();
 
+        Instant now = Instant.now();
         Trade trade = Trade.builder()
-                .tradeId(request.tradeId())
-                .mode(request.mode())
-                .description(request.description())
-                .jobSheetPdfPath(jobSheetPdfPath)
-                .trackingListPdfPath(trackingListPdfPath)
-                .createdAt(Instant.now())
-                .createdBy(createdBy)
-                .biddingOpen(true)
-                .currentRound(1)
-                .finalL1Rate(null)
-                .build();
+            .tradeId(request.tradeId())
+            .mode(request.mode())
+            .description(request.description())
+            .jobSheetPdfPath(jobSheetPdfPath)
+            .trackingListPdfPath(trackingListPdfPath)
+            .createdAt(now)
+            .autoCloseAt(calculateAutoCloseAt(now))
+            .createdBy(createdBy)
+            .biddingOpen(true)
+            .currentRound(1)
+            .finalL1Rate(null)
+            .build();
 
         Trade savedTrade = tradeRepository.save(trade);
 
@@ -126,8 +138,34 @@ public class TradeService {
         bid.setBidAmount(request.bidAmount());
         bid.setUpdatedAt(now);
         tradeBidRepository.save(bid);
+
+        emailService.sendTradeBidSubmissionConfirmation(
+            vendor.getEmail(),
+            trade.getTradeId(),
+            trade.getCurrentRound(),
+            frontendBaseUrl + "/trades/" + tradeId);
         return new MessageResponse("Bid submitted successfully.");
         }
+
+    @Transactional
+    public List<String> autoCloseDueTrades() {
+        Instant now = Instant.now();
+        List<Trade> dueTrades = tradeRepository
+            .findByBiddingOpenTrueAndClosedAtIsNullAndAutoCloseAtLessThanEqual(now);
+
+        List<String> closedTradeIds = new ArrayList<>();
+        for (Trade trade : dueTrades) {
+            try {
+                closeCurrentRound(trade);
+                sendAutoCloseNotifications(trade);
+                closedTradeIds.add(trade.getTradeId());
+            } catch (Exception ignored) {
+                // Scheduler will retry on the next tick.
+            }
+        }
+
+        return closedTradeIds;
+    }
 
         @Transactional(readOnly = true)
         public List<TradeBidRankResponse> getTopThreeBids(UUID tradeId) {
@@ -137,8 +175,8 @@ public class TradeService {
         return buildLeaderboard(trade, true);
         }
 
-        @Transactional(readOnly = true)
-        public TradeBidBoardResponse getBidBoard(UUID tradeId) {
+    @Transactional(readOnly = true)
+    public TradeBidBoardResponse getBidBoard(UUID tradeId) {
         AppUser currentUser = resolveCurrentUser();
         Trade trade = tradeRepository.findById(tradeId)
             .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ErrorCode.TRADE_NOT_FOUND,
@@ -193,38 +231,25 @@ public class TradeService {
             myCurrentBid,
             List.of(),
             myEntries);
-        }
+    }
 
-        @Transactional
-        public MessageResponse closeRound(UUID tradeId) {
+    @Transactional
+    public MessageResponse closeRound(UUID tradeId) {
         Trade trade = tradeRepository.findById(tradeId)
             .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ErrorCode.TRADE_NOT_FOUND,
                 "Trade not found"));
 
-        if (trade.getClosedAt() != null) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BIDDING_ALREADY_CLOSED,
-                "Trade is already closed");
+        closeCurrentRound(trade);
+
+        if (trade.getCurrentRound() >= 2) {
+            return new MessageResponse("Round 2 closed successfully. You can now finalize the trade.");
         }
 
-        if (!trade.isBiddingOpen()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BIDDING_ALREADY_CLOSED,
-                "Current round is already closed");
-        }
+        return new MessageResponse("Round 1 closed successfully. You can now start round 2 or finalize the trade.");
+    }
 
-        TradeBid roundL1Bid = tradeBidRepository
-            .findFirstByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(tradeId, trade.getCurrentRound())
-            .orElse(null);
-
-        trade.setBiddingOpen(false);
-        trade.setFinalL1Rate(roundL1Bid == null ? null : roundL1Bid.getBidAmount());
-        tradeRepository.save(trade);
-
-        return new MessageResponse("Round " + trade.getCurrentRound()
-                + " closed successfully. You can now start next round or close trade.");
-        }
-
-        @Transactional
-        public MessageResponse closeBid(UUID tradeId) {
+    @Transactional
+    public MessageResponse closeBid(UUID tradeId) {
         Trade trade = tradeRepository.findById(tradeId)
             .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ErrorCode.TRADE_NOT_FOUND,
                 "Trade not found"));
@@ -245,6 +270,7 @@ public class TradeService {
 
         trade.setClosedAt(Instant.now());
         trade.setFinalL1Rate(winningBid == null ? null : winningBid.getBidAmount());
+        trade.setBiddingOpen(false);
         tradeRepository.save(trade);
 
         if (winningBid != null) {
@@ -271,15 +297,15 @@ public class TradeService {
         }
 
         return new MessageResponse("Trade closed successfully.");
-        }
+    }
 
-        @Transactional
-        public MessageResponse reopenBid(UUID tradeId) {
+    @Transactional
+    public MessageResponse reopenBid(UUID tradeId) {
         return startNextRound(tradeId);
-        }
+    }
 
-        @Transactional
-        public MessageResponse startNextRound(UUID tradeId) {
+    @Transactional
+    public MessageResponse startNextRound(UUID tradeId) {
         Trade trade = tradeRepository.findById(tradeId)
             .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ErrorCode.TRADE_NOT_FOUND,
                 "Trade not found"));
@@ -294,11 +320,17 @@ public class TradeService {
                 "Current round is still open");
         }
 
+        if (trade.getCurrentRound() >= 2) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BIDDING_ALREADY_CLOSED,
+                "Round 2 is the final round. Please finalize the trade instead.");
+        }
+
         int previousRoundNumber = trade.getCurrentRound();
         BigDecimal previousRoundL1Bid = trade.getFinalL1Rate();
 
         trade.setBiddingOpen(true);
         trade.setCurrentRound(trade.getCurrentRound() + 1);
+        trade.setAutoCloseAt(calculateAutoCloseAt(Instant.now()));
         tradeRepository.save(trade);
 
         List<String> participantEmails = tradeBidRepository.findDistinctParticipantEmailsByTradeId(tradeId);
@@ -312,7 +344,73 @@ public class TradeService {
             detailsUrl);
 
         return new MessageResponse("Round " + trade.getCurrentRound() + " started successfully.");
+    }
+
+    private TradeBid closeCurrentRound(Trade trade) {
+        if (trade.getClosedAt() != null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BIDDING_ALREADY_CLOSED,
+                "Trade is already closed");
         }
+
+        if (!trade.isBiddingOpen()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BIDDING_ALREADY_CLOSED,
+                "Current round is already closed");
+        }
+
+        TradeBid roundL1Bid = tradeBidRepository
+            .findFirstByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(trade.getId(), trade.getCurrentRound())
+            .orElse(null);
+
+        trade.setBiddingOpen(false);
+        trade.setFinalL1Rate(roundL1Bid == null ? null : roundL1Bid.getBidAmount());
+        tradeRepository.save(trade);
+        return roundL1Bid;
+    }
+
+    private void sendAutoCloseNotifications(Trade trade) {
+        List<String> recipients = new ArrayList<>();
+        recipients.addAll(appUserRepository.findDistinctByRoles_Name(RoleName.ADMIN).stream()
+            .map(AppUser::getEmail)
+            .filter(email -> email != null && !email.isBlank())
+            .toList());
+        recipients.addAll(appUserRepository.findDistinctByRoles_Name(RoleName.EXECUTIVE).stream()
+            .map(AppUser::getEmail)
+            .filter(email -> email != null && !email.isBlank())
+            .toList());
+        recipients.addAll(tradeBidRepository.findDistinctParticipantEmailsByTradeId(trade.getId()));
+
+        List<String> uniqueRecipients = recipients.stream()
+            .filter(email -> email != null && !email.isBlank())
+            .collect(java.util.stream.Collectors.collectingAndThen(
+                java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                List::copyOf));
+
+        if (!uniqueRecipients.isEmpty()) {
+            String detailsUrl = frontendBaseUrl + "/trades/" + trade.getId();
+            emailService.sendTradeRoundClosedNotification(
+                uniqueRecipients,
+                trade.getTradeId(),
+                trade.getDescription(),
+                trade.getCurrentRound(),
+                trade.getFinalL1Rate(),
+                detailsUrl);
+        }
+    }
+
+    private Instant calculateAutoCloseAt(Instant createdAt) {
+        ZoneId zoneId = ZoneId.of(tradeAutoCloseZone);
+        ZonedDateTime createdDateTime = createdAt.atZone(zoneId);
+        ZonedDateTime nextDayClose = createdDateTime.toLocalDate()
+            .plusDays(1)
+            .atTime(LocalTime.of(tradeAutoCloseHour, 0))
+            .atZone(zoneId);
+
+        if (!nextDayClose.isAfter(createdDateTime)) {
+            nextDayClose = nextDayClose.plusDays(1);
+        }
+
+        return nextDayClose.toInstant();
+    }
 
         private List<String> resolveNotificationRecipients(CreateTradeRequest request) {
         TradeNotificationScope scope = request.notificationScope();
@@ -356,13 +454,18 @@ public class TradeService {
         }
 
     @Transactional(readOnly = true)
-    public Page<TradeResponse> getAllTrades(Pageable pageable) {
+    public Page<TradeResponse> getAllTrades(Pageable pageable, String query, TradeMode mode, String status) {
         AppUser currentUser = resolveCurrentUser();
+        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+        String normalizedStatus = status == null || status.isBlank() ? "ALL" : status.trim().toUpperCase(Locale.ROOT);
+
         if (hasRole(currentUser, RoleName.VENDOR)) {
             Vendor vendor = resolveCurrentVendor();
-            return tradeRepository.findDistinctByVendorId(vendor.getId(), pageable).map(this::toResponse);
+            return tradeRepository.searchTradesForVendor(vendor.getId(), normalizedQuery, mode, normalizedStatus, pageable)
+                .map(this::toResponse);
         }
-        return tradeRepository.findAll(pageable).map(this::toResponse);
+        return tradeRepository.searchAllTrades(normalizedQuery, mode, normalizedStatus, pageable)
+            .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -471,7 +574,6 @@ public class TradeService {
 
         List<TradeBidRankResponse> leaderboard = new ArrayList<>();
         List<String> ranks = List.of("L1", "L2", "L3");
-
         for (int i = 0; i < Math.min(3, roundBids.size()); i++) {
             TradeBid bid = roundBids.get(i);
             leaderboard.add(new TradeBidRankResponse(
@@ -481,6 +583,10 @@ public class TradeService {
                     hideVendorIdentity ? null : bid.getVendor().getCompanyName()));
         }
         return leaderboard;
+    }
+
+    private boolean isFinalRound(Trade trade) {
+        return trade.getCurrentRound() >= 2;
     }
 
     private TradeBidEntryResponse toBidEntry(TradeBid bid) {
@@ -550,6 +656,7 @@ public class TradeService {
                 trade.getClosedAt() != null,
                 trade.getFinalL1Rate(),
                 trade.getCreatedAt(),
+                trade.getAutoCloseAt(),
                 trade.getCreatedBy().getEmail());
     }
 

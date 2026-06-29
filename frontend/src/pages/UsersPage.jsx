@@ -28,6 +28,8 @@ import { Edit as EditIcon, Delete as DeleteIcon, Visibility as VisibilityIcon, V
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useDeleteConfirm } from '../context/DeleteConfirmContext';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 export default function UsersPage() {
   const [data, setData] = useState(null);
@@ -132,6 +134,9 @@ export default function UsersPage() {
     return 'VENDOR';
   };
 
+  const theme = useTheme();
+  const isSm = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <Stack spacing={3} sx={{ width: '100%' }}>
       <Typography variant="h5">Users</Typography>
@@ -140,35 +145,25 @@ export default function UsersPage() {
 
       <Card sx={{ width: '100%' }}>
         <CardContent sx={{ width: '100%', p: { xs: 2, sm: 3 }, overflow: 'hidden' }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 2, gap: 1 }}>
+          <Stack direction="row" flexWrap="wrap" alignItems="center" sx={{ mb: 2, gap: 1, width: '100%' }}>
             <Typography variant="h6">User List</Typography>
-            <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Add User</Button>
+            <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ ml: 'auto', backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Add User</Button>
           </Stack>
-          <Box sx={{ overflowX: 'auto', overflowY: 'hidden', width: '100%', WebkitOverflowScrolling: 'touch' }}>
-            <Table size="small" sx={{ width: '100%', minWidth: 600 }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Email</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Name</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Phone</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Company</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Enabled</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Verified</TableCell>
-                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Roles</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data?.content?.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{u.email}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{u.name}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{u.mobileNo}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{u.companyName}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{String(u.enabled)}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{String(u.emailVerified)}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{u.roles?.join(', ')}</TableCell>
-                    <TableCell>
+          {isSm ? (
+            <Stack spacing={1}>
+              {data?.content?.map((u) => (
+                <Card key={u.id} variant="outlined" sx={{ p: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="subtitle2">{u.email}</Typography>
+                      <Typography variant="body2" color="text.secondary">{u.name}</Typography>
+                      {u.mobileNo && <Typography variant="body2" color="text.secondary">{u.mobileNo}</Typography>}
+                      {u.companyName && <Typography variant="body2" color="text.secondary">{u.companyName}</Typography>}
+                      {u.roles && <Typography variant="caption" color="text.secondary">{u.roles.join(', ')}</Typography>}
+                    </Box>
+                    <Stack spacing={0.5} alignItems="flex-end">
+                      <Typography variant="caption" color="text.secondary">Enabled: {String(u.enabled)}</Typography>
+                      <Typography variant="caption" color="text.secondary">Verified: {String(u.emailVerified)}</Typography>
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title="Edit">
                           <IconButton size="small" onClick={() => {
@@ -189,12 +184,64 @@ export default function UsersPage() {
                           </IconButton>
                         </Tooltip>
                       </Stack>
-                    </TableCell>
+                    </Stack>
+                  </Stack>
+                </Card>
+              ))}
+            </Stack>
+          ) : (
+            <Box sx={{ overflowX: 'auto', overflowY: 'hidden', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+              <Table size="small" sx={{ width: '100%', minWidth: 600 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Email</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Name</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Phone</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Company</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Enabled</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Verified</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Roles</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
+                </TableHead>
+                <TableBody>
+                  {data?.content?.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{u.email}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{u.name}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{u.mobileNo}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{u.companyName}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{String(u.enabled)}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{String(u.emailVerified)}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{u.roles?.join(', ')}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5}>
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => {
+                              const currentRole = roleFromUser(u);
+                              setEditingUser({ ...u, role: currentRole, originalRole: currentRole });
+                            }} color="primary">
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={u.enabled ? 'Disable' : 'Enable'}>
+                            <IconButton size="small" onClick={() => toggleStatus(u)} color={u.enabled ? 'warning' : 'success'}>
+                              {u.enabled ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton size="small" onClick={() => removeUser(u)} color="error">
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
           {!!data && (
             <Pagination
               sx={{ mt: 2 }}

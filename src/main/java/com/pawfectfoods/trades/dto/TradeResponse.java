@@ -17,6 +17,7 @@ public record TradeResponse(
         boolean tradeClosed,
         BigDecimal finalL1Rate,
         Instant createdAt,
+        Instant autoCloseAt,
         String createdBy
 ) {
 }

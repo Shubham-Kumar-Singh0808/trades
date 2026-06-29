@@ -1,4 +1,7 @@
 import { Alert, Button, Card, CardContent, Chip, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 
@@ -9,6 +12,8 @@ export default function PendingRegistrationsPage({ session }) {
 
   const roles = session?.roles || [];
   const canReviewRequests = roles.includes('ADMIN') || roles.includes('EXECUTIVE');
+  const theme = useTheme();
+  const isSm = useMediaQuery(theme.breakpoints.down('sm'));
 
   const approveLabelFor = (row) => {
     if (roles.includes('ADMIN') && row?.executiveApproved) {
@@ -77,69 +82,78 @@ export default function PendingRegistrationsPage({ session }) {
             <Typography variant="h6" sx={{ mb: 1.5 }}>
               Pending Registration Requests ({registrationRequests.length})
             </Typography>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Company</TableCell>
-                  <TableCell>GST</TableCell>
-                  <TableCell>GST Status</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Office Address</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+            {isSm ? (
+              <Stack spacing={1}>
                 {registrationRequests.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell>{row.companyName}</TableCell>
-                    <TableCell>{row.gstNo}</TableCell>
-                    <TableCell>
-                      <Stack spacing={0.5}>
-                        <Chip
-                          size="small"
-                          label={row?.gstActive ? 'Active' : 'Not Active'}
-                          color={row?.gstActive ? 'success' : 'default'}
-                          variant={row?.gstActive ? 'filled' : 'outlined'}
-                        />
-                        <Typography variant="caption" sx={{ color: '#586b5f' }}>
-                          {row.gstStatus || '-'}
-                        </Typography>
+                  <Card key={row.id} variant="outlined">
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                          <Typography variant="subtitle1">{row.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{row.gstNo || '-'}</Typography>
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary">{row.companyName}</Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip size="small" label={row?.gstActive ? 'Active' : 'Not Active'} color={row?.gstActive ? 'success' : 'default'} variant={row?.gstActive ? 'filled' : 'outlined'} />
+                          <Typography variant="caption" sx={{ color: '#586b5f' }}>{row.gstStatus || '-'}</Typography>
+                        </Stack>
+                        <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{row.email}</Typography>
+                        <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{row.officeAddress}</Typography>
+                        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                          <Button size="small" variant="contained" onClick={() => approveRegistration(row.id)} sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}>{approveLabelFor(row)}</Button>
+                          <Button size="small" variant="outlined" disabled={!roles.includes('ADMIN')} onClick={() => rejectRegistration(row.id)} color="error">Reject</Button>
+                        </Stack>
                       </Stack>
-                    </TableCell>
-                    <TableCell>{row.email}</TableCell>
-                    <TableCell>{row.officeAddress}</TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1}>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={() => approveRegistration(row.id)}
-                          sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
-                        >
-                          {approveLabelFor(row)}
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={!roles.includes('ADMIN')}
-                          onClick={() => rejectRegistration(row.id)}
-                          color="error"
-                        >
-                          Reject
-                        </Button>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
+                    </CardContent>
+                  </Card>
                 ))}
                 {registrationRequests.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7}>No pending vendor registrations.</TableCell>
-                  </TableRow>
+                  <Typography>No pending vendor registrations.</Typography>
                 )}
-              </TableBody>
-            </Table>
+              </Stack>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Company</TableCell>
+                    <TableCell>GST</TableCell>
+                    <TableCell>GST Status</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Office Address</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {registrationRequests.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.name}</TableCell>
+                      <TableCell>{row.companyName}</TableCell>
+                      <TableCell>{row.gstNo}</TableCell>
+                      <TableCell>
+                        <Stack spacing={0.5}>
+                          <Chip size="small" label={row?.gstActive ? 'Active' : 'Not Active'} color={row?.gstActive ? 'success' : 'default'} variant={row?.gstActive ? 'filled' : 'outlined'} />
+                          <Typography variant="caption" sx={{ color: '#586b5f' }}>{row.gstStatus || '-'}</Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{row.email}</TableCell>
+                      <TableCell sx={{ maxWidth: 300, wordBreak: 'break-word' }}>{row.officeAddress}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1}>
+                          <Button size="small" variant="contained" onClick={() => approveRegistration(row.id)} sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}>{approveLabelFor(row)}</Button>
+                          <Button size="small" variant="outlined" disabled={!roles.includes('ADMIN')} onClick={() => rejectRegistration(row.id)} color="error">Reject</Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {registrationRequests.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7}>No pending vendor registrations.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}

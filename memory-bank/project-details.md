@@ -1,14 +1,16 @@
 # Project Details
 
-Last updated: 2026-04-20 (round-close + next-round flow, DIRECT/HOPPING mode alias)
+Last updated: 2026-05-11 (autoCloseAt migration fix, two-round trade flow, list search/filter, RFQ sender, bid confirmations, 10 AM auto-close scheduler)
 
 Hotfix note (2026-04-20): `tradeClosed` is now derived from `closedAt != null` in service/response mapping and is not persisted as a dedicated DB column.
 
 Terminology note (2026-04-20): user-facing `Tracking List PDF` is renamed to `Packing List PDF`; backend supports both `/tracking-list/...` and `/packing-list/...` endpoints.
 
-Binding/query note (2026-04-22):
+Binding/query note (2026-05-11):
 - Trade mode form binding supports UI aliases like `DIRECT` and `HOPPING` via `TradeModeConverter`.
-- Vendor trade listing uses a `Trade`-root pageable query (`TradeRepository.findDistinctByVendorId`) to avoid sorting errors on bid-root queries.
+- Trade list now supports server-side text search plus mode/status filters.
+- Vendor and admin trade listing both use `Trade`-root pageable search queries so sorting stays stable.
+- `Trade.autoCloseAt` is nullable for legacy rows during migration, with startup backfill to populate missing values.
 
 ## Project Overview
 - Name: trades
@@ -34,9 +36,13 @@ Binding/query note (2026-04-22):
 - GST-based vendor registration with admin approval gate
 - Vendor profile/contact change requests requiring approval
 - Trade management with PDF upload and vendor email notifications
+- Two-round RFQ flow with manual finalize support and next-day auto-close scheduling
+- RFQ trade emails use `RFQ@pawfectfoods.co.in` with CC to dispatch/pushkar, and trades auto-close at 10 AM the next day
 - Link-based trade notification (email contains details URL, not file attachment)
 - JWT HttpOnly cookie authentication support
 - React + Material UI frontend scaffold (localhost:4000)
+- Vendor registration form is single-page, mobile responsive, and validates blocked email domains (`gmail.com`, `yahoo.com`) plus unique contact mobile numbers
+- Dockerized deployment with PostgreSQL, backend, and Nginx HTTPS reverse proxy
 
 ## Architecture (Clean Layering)
 - Controller layer: HTTP endpoints and request/response mapping
@@ -73,7 +79,7 @@ Binding/query note (2026-04-22):
   - fields: requested profile/contact values, status (`PENDING`, `APPROVED`, `REJECTED`), audit metadata
 - `Trade`
   - table: `trade`
-  - fields: id (UUID), tradeId, mode, description, pdfPath, createdAt, createdBy
+  - fields: id (UUID), tradeId, mode, description, pdfPath, createdAt, autoCloseAt, biddingOpen, currentRound, closedAt, finalL1Rate, createdBy
 
 ## Security Design
 - Stateless auth (`SessionCreationPolicy.STATELESS`)
@@ -258,7 +264,9 @@ Binding/query note (2026-04-22):
 - Main config: `src/main/resources/application.properties`
   - PostgreSQL datasource (`pawfectfoods`, user `dspace`)
   - schema generation mode currently set to `create` (rebuilds schema on startup)
-  - Gmail SMTP over SSL (port 465)
+  - SMTP over SSL (port 465)
+  - RFQ mail sender: `RFQ@pawfectfoods.co.in`
+  - RFQ mail CC: `dispatch@pawfectfoods.co.uk`, `pushkar@pawfectfoods.co.in`
   - JWT secret and expiration
   - verification URL base
   - bootstrap admin credentials (`app.bootstrap.admin.*`)
@@ -266,6 +274,7 @@ Binding/query note (2026-04-22):
   - file upload config (`app.file.upload-dir`, `app.file.max-size-bytes`)
   - multipart size limits
   - frontend base URL (`app.frontend.base-url=http://localhost:4000`)
+  - RFQ auto-close zone/hour (`app.trade.auto-close-zone`, `app.trade.auto-close-hour`)
 
 ## Frontend
 - Path: `frontend/`

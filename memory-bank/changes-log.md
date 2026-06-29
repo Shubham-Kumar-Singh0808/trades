@@ -1,5 +1,78 @@
 # Changes Log
 
+## 2026-05-14 - Docker + Nginx Deployment Packaging
+
+### DevOps Updates
+- Added Dockerfiles for backend and Nginx (frontend build + HTTPS termination).
+- Added docker-compose stack with PostgreSQL, backend, and Nginx reverse proxy.
+- Added deployment guide and environment template for server setup.
+
+## 2026-05-11 - RFQ CC Recipient Update
+
+### Backend Updates
+- Added `anubhav@pawfectfoods.co.uk` and `prash@pawfectfoods.co.uk` to the RFQ CC recipient list.
+
+### Validation
+- Configuration update only.
+
+## 2026-05-11 - Fix: autoCloseAt Migration Failure
+
+### Backend Updates
+- Changed `Trade.autoCloseAt` to allow null during schema migration so existing `trade` rows do not block startup.
+- Added a startup backfill in `DataInitializer` to populate missing `autoCloseAt` values for legacy trades using the next-day 10 AM Asia/Kolkata rule.
+
+### Validation
+- Backend compile: `Set-Location d:\trades; .\mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-05-11 - Two-Round Trade Flow + Trade List Search/Filter
+
+### Backend Updates
+- Limited trade bidding to two rounds only.
+- Round 1 can now be finalized directly without starting round 2.
+- Round 2 is the final round; attempts to start a third round are rejected.
+- Starting a new round refreshes the trade's `autoCloseAt` timestamp.
+- Added server-side trade search and filtering by text, mode, and status.
+
+### Frontend Updates
+- Trade list now includes search, mode, and status controls.
+- Trade details page now reflects the R1/R2-only flow and hides the next-round action after round 2.
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+- Frontend build: `npm --prefix D:\trades\frontend run build` -> `BUILD SUCCESS`
+
+## 2026-05-11 - RFQ Mail Sender + Auto-Close Scheduler
+
+### Backend Updates
+- Updated mail sender configuration to use `RFQ@pawfectfoods.co.in` as the From/SMTP username.
+- Added default CC recipients for RFQ emails:
+  - `dispatch@pawfectfoods.co.uk`
+  - `pushkar@pawfectfoods.co.in`
+- Added `autoCloseAt` to `Trade` and scheduled auto-close processing for due trades at 10 AM Asia/Kolkata time.
+- Added RFQ email templates for:
+  - posting a new RFQ to vendors
+  - bid submission confirmation
+  - round closure with L1 value for admins, executives, and participating vendors
+
+### Validation
+- Backend compile: `./mvnw.cmd -DskipTests compile` -> `BUILD SUCCESS`
+
+## 2026-05-10 - Vendor Registration Form Simplification + Validation Hardening
+
+### Frontend Updates
+- Removed the stepper flow from `VendorRegistrationPage` and rendered the registration form as a single continuous page.
+- Added email-domain validation for the main vendor email field:
+  - blocks `gmail.com`
+  - blocks `yahoo.com`
+- Added uniqueness validation for contact person mobile numbers, matching the existing contact email uniqueness behavior.
+- Improved mobile responsiveness by reordering the sidebar below the form on small screens and making primary actions full width on phones.
+- Added visible helper text describing the unique email/mobile requirements and blocked email domains.
+- Updated the vendor email field label to explicitly show that Gmail and Yahoo addresses are excluded.
+- Applied the same Gmail/Yahoo exclusion rule to contact person email fields and updated their label/helper text.
+
+### Validation
+- Frontend file check: `VendorRegistrationPage.jsx` -> no errors found
+
 ## 2026-04-22 - Fix: HOPPING Mode Validation + Vendor /api/trades 500
 
 ### Issues

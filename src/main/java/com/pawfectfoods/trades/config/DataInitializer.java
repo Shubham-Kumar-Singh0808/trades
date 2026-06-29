@@ -3,10 +3,17 @@ package com.pawfectfoods.trades.config;
 import com.pawfectfoods.trades.model.AppUser;
 import com.pawfectfoods.trades.model.Role;
 import com.pawfectfoods.trades.model.RoleName;
+import com.pawfectfoods.trades.model.Trade;
 import com.pawfectfoods.trades.repository.AppUserRepository;
 import com.pawfectfoods.trades.repository.RoleRepository;
+import com.pawfectfoods.trades.repository.TradeRepository;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +32,7 @@ public class DataInitializer implements ApplicationRunner {
 
     private final RoleRepository roleRepository;
     private final AppUserRepository userRepository;
+    private final TradeRepository tradeRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppBootstrapProperties bootstrapProperties;
 
@@ -33,6 +41,7 @@ public class DataInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         initializeRoles();
         initializeAdminUser();
+        backfillTradeAutoCloseAt();
     }
 
     private void initializeRoles() {
@@ -77,5 +86,32 @@ public class DataInitializer implements ApplicationRunner {
             userRepository.save(user);
             log.info("ADMIN role assigned to existing user: {}", user.getEmail());
         }
+    }
+
+    private void backfillTradeAutoCloseAt() {
+        List<Trade> tradesNeedingAutoClose = tradeRepository.findAll().stream()
+                .filter(trade -> trade.getAutoCloseAt() == null)
+                .toList();
+
+        if (tradesNeedingAutoClose.isEmpty()) {
+            return;
+        }
+
+        ZoneId zoneId = ZoneId.of("Asia/Kolkata");
+        for (Trade trade : tradesNeedingAutoClose) {
+            Instant createdAt = trade.getCreatedAt();
+            ZonedDateTime createdDateTime = createdAt.atZone(zoneId);
+            ZonedDateTime nextDayClose = createdDateTime.toLocalDate()
+                    .plusDays(1)
+                    .atTime(LocalTime.of(10, 0))
+                    .atZone(zoneId);
+            if (!nextDayClose.isAfter(createdDateTime)) {
+                nextDayClose = nextDayClose.plusDays(1);
+            }
+            trade.setAutoCloseAt(nextDayClose.toInstant());
+        }
+
+        tradeRepository.saveAll(tradesNeedingAutoClose);
+        log.info("Backfilled autoCloseAt for {} existing trade(s)", tradesNeedingAutoClose.size());
     }
 }

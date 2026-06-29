@@ -14,7 +14,9 @@ Security by endpoint:
 - Content-Type: multipart/form-data
 - Roles: ADMIN, EXECUTIVE
 - Use: Create a trade with two PDF attachments (job sheet + tracking list) and notify vendors by email.
-- Email sends a details URL (no file attachment).
+- Email sends an RFQ posting notice with a portal link.
+- Outgoing RFQ mail uses `RFQ@pawfectfoods.co.in` and CCs RFQ stakeholders.
+- The trade is scheduled to auto-close at 10 AM the next day (Asia/Kolkata) unless it is closed manually earlier.
 
 Form fields:
 - tradeId (string, unique)
@@ -54,6 +56,7 @@ curl -X POST "http://localhost:8080/api/trades" \
 Validation:
 - only PDF allowed
 - max file size enforced by config
+- auto-close timestamp is computed on creation and stored with the trade
 
 ## 2) Get All Trades (Paginated)
 - Method: GET
@@ -61,9 +64,20 @@ Validation:
 - Roles: ADMIN, EXECUTIVE, VENDOR
 - Use: View paginated trades with sorting.
 
+Optional query params:
+- query: text search across trade ID, description, creator email, and creator name
+- mode: filter by trade mode
+- status: filter by OPEN, ROUND_CLOSED, or FINALIZED
+
 cURL:
 ```bash
 curl -X GET "http://localhost:8080/api/trades?page=0&size=10&sort=createdAt,desc" \
+  -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
+```
+
+Filtered cURL:
+```bash
+curl -X GET "http://localhost:8080/api/trades?page=0&size=10&sort=createdAt,desc&query=TRD-2026&status=OPEN" \
   -H "Authorization: Bearer <ANY_ROLE_TOKEN>"
 ```
 
@@ -153,6 +167,17 @@ When a trade is created:
   "jobSheetPdfPath": "/uploads/trades/7abf7de4-23b6-4f6e-9a30-1b8aef77f0bc_job-sheet.pdf",
   "trackingListPdfPath": "/uploads/trades/5bcf7de4-87b6-4f6e-9a30-9a8aef77a0de_tracking-list.pdf",
   "createdAt": "2026-04-04T15:00:00Z",
+  "autoCloseAt": "2026-04-05T04:30:00Z",
   "createdBy": "admin@pawfectfoods.com"
 }
 ```
+
+## Email Notification Behavior
+When a trade is created:
+- Recipient selection is controlled by `notificationScope`:
+  - `SELECTED`: sends only to provided `vendorIds`
+  - `ALL_ACTIVE`: sends to all active vendors
+  - `ALL`: sends to all vendors (active and inactive)
+- Each successful bid submission gets a confirmation email.
+- At auto-close or manual round close, admins, executives, and all participating vendors receive the current L1 rate.
+- Every outgoing RFQ email is sent from `RFQ@pawfectfoods.co.in` with CC to RFQ stakeholders.

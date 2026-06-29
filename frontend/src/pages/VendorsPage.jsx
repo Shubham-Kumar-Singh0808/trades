@@ -18,6 +18,9 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import Box from '@mui/material/Box';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 
@@ -35,6 +38,8 @@ export default function VendorsPage({ session }) {
   const isAdmin = roles.includes('ADMIN');
   const isExecutive = roles.includes('EXECUTIVE');
   const canCreateVendor = isAdmin || isExecutive;
+  const theme = useTheme();
+  const isSm = useMediaQuery(theme.breakpoints.down('sm'));
 
   const approveLabelFor = (row) => {
     if (isAdmin && row?.executiveApproved) {
@@ -104,54 +109,86 @@ export default function VendorsPage({ session }) {
 
       <Card>
         <CardContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Stack direction="row" flexWrap="wrap" alignItems="center" sx={{ mb: 2, width: '100%' }}>
             <Typography variant="h6">Vendor List</Typography>
             {canCreateVendor && (
-              <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Add Vendor</Button>
+              <Button variant="contained" onClick={() => setCreateModalOpen(true)} sx={{ ml: 'auto', backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, px: 3 }}>Add Vendor</Button>
             )}
           </Stack>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Company</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Mobile</TableCell>
-                <TableCell>Registration Status</TableCell>
-                <TableCell>GST Status</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          {/* Responsive: card list on small screens, table for larger */}
+          {isSm ? (
+            <Stack spacing={1}>
               {data?.content?.map((v) => (
-                <TableRow key={v.id}>
-                  <TableCell>{v.name}</TableCell>
-                  <TableCell>{v.companyName}</TableCell>
-                  <TableCell>{v.email}</TableCell>
-                  <TableCell>{v.mobileNo}</TableCell>
-                  <TableCell>{v.registrationStatus || (v.active ? 'APPROVED' : 'INACTIVE')}</TableCell>
-                  <TableCell>
-                    <Stack spacing={0.5}>
-                      {renderGstActiveChip(v)}
-                      <Typography variant="caption" sx={{ color: '#586b5f' }}>
-                     
-                      </Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => openContactDetails(v)}
-                      sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
-                    >
-                      View Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <Card key={v.id} variant="outlined" sx={{ p: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="subtitle2">{v.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">{v.companyName}</Typography>
+                      <Typography variant="body2" color="text.secondary">{v.email}</Typography>
+                      {v.mobileNo && <Typography variant="body2" color="text.secondary">{v.mobileNo}</Typography>}
+                      <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                        {renderGstActiveChip(v)}
+                        <Typography variant="caption" color="text.secondary">{v.registrationStatus || (v.active ? 'APPROVED' : 'INACTIVE')}</Typography>
+                      </Stack>
+                    </Box>
+                    <Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openContactDetails(v)}
+                        sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
+                      >
+                        View
+                      </Button>
+                    </Box>
+                  </Stack>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
+            </Stack>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Company</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Mobile</TableCell>
+                  <TableCell>Registration Status</TableCell>
+                  <TableCell>GST Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data?.content?.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell>{v.name}</TableCell>
+                    <TableCell>{v.companyName}</TableCell>
+                    <TableCell>{v.email}</TableCell>
+                    <TableCell>{v.mobileNo}</TableCell>
+                    <TableCell>{v.registrationStatus || (v.active ? 'APPROVED' : 'INACTIVE')}</TableCell>
+                    <TableCell>
+                      <Stack spacing={0.5}>
+                        {renderGstActiveChip(v)}
+                        <Typography variant="caption" sx={{ color: '#586b5f' }}>
+                        
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openContactDetails(v)}
+                        sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
           {!!data && (
             <Pagination
               sx={{ mt: 2 }}
@@ -191,33 +228,51 @@ export default function VendorsPage({ session }) {
             Primary vendor email: {selectedVendor?.email || '-'}
           </Typography>
 
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>#</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Designation</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Phone</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          {isSm ? (
+            <Stack spacing={1}>
               {(selectedVendor?.contactPersons || []).map((cp, index) => (
-                <TableRow key={cp.id || `cp-${index}`}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{cp.name}</TableCell>
-                  <TableCell>{cp.designation}</TableCell>
-                  <TableCell>{cp.email}</TableCell>
-                  <TableCell>{cp.phone}</TableCell>
-                </TableRow>
+                <Card key={cp.id || `cp-${index}`} variant="outlined" sx={{ p: 1 }}>
+                  <Stack spacing={1}>
+                    <Typography variant="subtitle2">{cp.name || '-'}</Typography>
+                    <Typography variant="body2" color="text.secondary">{cp.designation || '-'}</Typography>
+                    <Typography variant="body2" color="text.secondary">{cp.email || '-'}</Typography>
+                    <Typography variant="body2" color="text.secondary">{cp.phone || '-'}</Typography>
+                  </Stack>
+                </Card>
               ))}
               {(selectedVendor?.contactPersons || []).length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5}>No contact persons available.</TableCell>
-                </TableRow>
+                <Typography>No contact persons available.</Typography>
               )}
-            </TableBody>
-          </Table>
+            </Stack>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>#</TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Designation</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(selectedVendor?.contactPersons || []).map((cp, index) => (
+                  <TableRow key={cp.id || `cp-${index}`}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{cp.name}</TableCell>
+                    <TableCell>{cp.designation}</TableCell>
+                    <TableCell>{cp.email}</TableCell>
+                    <TableCell>{cp.phone}</TableCell>
+                  </TableRow>
+                ))}
+                {(selectedVendor?.contactPersons || []).length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5}>No contact persons available.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setContactModalOpen(false)} sx={{ color: '#666' }}>Close</Button>

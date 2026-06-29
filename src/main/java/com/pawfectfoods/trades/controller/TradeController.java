@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -46,14 +47,24 @@ public class TradeController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE','VENDOR')")
     public ResponseEntity<Page<TradeResponse>> getAllTrades(
-            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(tradeService.getAllTrades(pageable));
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "mode", required = false) String mode,
+            @RequestParam(value = "status", required = false) String status) {
+        return ResponseEntity.ok(tradeService.getAllTrades(pageable, query, parseTradeMode(mode), status));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE','VENDOR')")
     public ResponseEntity<TradeResponse> getTradeById(@PathVariable UUID id) {
         return ResponseEntity.ok(tradeService.getTradeById(id));
+    }
+
+    private com.pawfectfoods.trades.model.TradeMode parseTradeMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return null;
+        }
+        return com.pawfectfoods.trades.model.TradeMode.fromValue(mode);
     }
 
     @PostMapping("/{id}/bids")

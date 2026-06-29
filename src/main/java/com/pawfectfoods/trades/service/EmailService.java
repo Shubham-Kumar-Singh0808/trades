@@ -23,6 +23,9 @@ public class EmailService {
     @Value("${app.mail.from}")
     private String fromAddress;
 
+    @Value("${app.mail.cc:}")
+    private String mailCc;
+
     @Value("${app.verification.base-url}")
     private String verificationBaseUrl;
 
@@ -196,15 +199,82 @@ public class EmailService {
             return;
         }
 
-        String subject = "New Trade Opportunity - " + tradeId;
+        String subject = "PAWFECT RFQ ACTIVITY ID " + tradeId;
 
         for (String recipient : recipients) {
             try {
-                String htmlBody = buildTradeNotificationHtml(tradeId, description, mode, detailsUrl);
+                String htmlBody = buildRfqPostingHtml(tradeId, description, mode, detailsUrl);
                 sendHtmlEmail(recipient, subject, htmlBody);
             } catch (Exception ex) {
                 log.warn("Failed to send trade notification to {}", recipient, ex);
             }
+        }
+    }
+
+    public void sendTradeBidSubmissionConfirmation(
+            String toEmail,
+            String tradeId,
+            int roundNumber,
+            String detailsUrl) {
+        String ordinal = roundNumber == 1 ? "1st" : roundNumber == 2 ? "2nd" : roundNumber + "th";
+        String htmlBody = """
+                <html>
+                    <body style="margin:0;padding:0;background:#f6fbf8;font-family:'Segoe UI',Arial,sans-serif;">
+                        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="padding:24px 0;">
+                            <tr><td align="center">
+                                <table role="presentation" width="680" cellspacing="0" cellpadding="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.10);">
+                                    <tr><td style="padding:26px 32px;background:linear-gradient(120deg,#15803d,#166534);color:#fff;"><h2 style="margin:0;font-size:24px;">RFQ Submission Confirmation</h2></td></tr>
+                                    <tr><td style="padding:28px 32px;color:#1f2937;">
+                                        <p style="margin:0 0 12px;font-size:16px;">Dear Partner Vendor,</p>
+                                        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">Thank you for submitting the %s quotation in Activity ID <strong>%s</strong>.</p>
+                                        <p style="margin:0 0 18px;font-size:14px;line-height:1.7;">You will be notified with the L1 result after the closure of this round.</p>
+                                        <p style="margin:0 0 20px;"><a href="%s" style="display:inline-block;background:#166534;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">View RFQ</a></p>
+                                    </td></tr>
+                                </table>
+                            </td></tr>
+                        </table>
+                    </body>
+                </html>
+                """.formatted(ordinal, tradeId, detailsUrl);
+        sendHtmlEmail(toEmail, "RFQ submission confirmation - " + tradeId, htmlBody);
+    }
+
+    public void sendTradeRoundClosedNotification(
+            List<String> recipients,
+            String tradeId,
+            String description,
+            int roundNumber,
+            BigDecimal l1Rate,
+            String detailsUrl) {
+        if (recipients == null || recipients.isEmpty()) {
+            return;
+        }
+
+        String l1Text = l1Rate == null ? "N/A" : l1Rate.toPlainString();
+        String subject = "PAWFECT RFQ ROUND " + roundNumber + " CLOSED - Activity ID " + tradeId;
+
+        for (String recipient : recipients) {
+            String htmlBody = """
+                    <html>
+                        <body style="margin:0;padding:0;background:#f6fbf8;font-family:'Segoe UI',Arial,sans-serif;">
+                            <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="padding:24px 0;">
+                                <tr><td align="center">
+                                    <table role="presentation" width="720" cellspacing="0" cellpadding="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.10);">
+                                        <tr><td style="padding:26px 32px;background:linear-gradient(120deg,#0f172a,#1e293b);color:#fff;"><h2 style="margin:0;font-size:24px;">Round %s Closure</h2></td></tr>
+                                        <tr><td style="padding:28px 32px;color:#1f2937;">
+                                            <p style="margin:0 0 12px;font-size:16px;">Dear Partner Vendor,</p>
+                                            <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">Round %s of Activity ID <strong>%s</strong> has been completed.</p>
+                                            <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">The current L1 rate is: <strong>%s</strong></p>
+                                            <p style="margin:0 0 18px;font-size:14px;line-height:1.7;">Please login to review the RFQ activity details.</p>
+                                            <p style="margin:0 0 20px;"><a href="%s" style="display:inline-block;background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">Open RFQ</a></p>
+                                        </td></tr>
+                                    </table>
+                                </td></tr>
+                            </table>
+                        </body>
+                    </html>
+                    """.formatted(roundNumber, roundNumber, tradeId, l1Text, detailsUrl);
+            sendHtmlEmail(recipient, subject, htmlBody);
         }
     }
 
@@ -316,6 +386,7 @@ public class EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);
         message.setTo(toEmail);
+        applyCc(message);
         message.setSubject(subject);
         message.setText(body);
 
@@ -328,6 +399,7 @@ public class EmailService {
                         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, StandardCharsets.UTF_8.name());
                         helper.setFrom(fromAddress);
                         helper.setTo(toEmail);
+                        applyCc(helper);
                         helper.setSubject(subject);
                         helper.setText(htmlBody, true);
                         mailSender.send(mimeMessage);
@@ -335,6 +407,57 @@ public class EmailService {
                         log.warn("Failed to send HTML email to {}", toEmail, ex);
                 }
         }
+
+    private void applyCc(SimpleMailMessage message) {
+        String[] ccRecipients = parseCcRecipients();
+        if (ccRecipients.length > 0) {
+            message.setCc(ccRecipients);
+        }
+    }
+
+    private void applyCc(MimeMessageHelper helper) throws jakarta.mail.MessagingException {
+        String[] ccRecipients = parseCcRecipients();
+        if (ccRecipients.length > 0) {
+            helper.setCc(ccRecipients);
+        }
+    }
+
+    private String[] parseCcRecipients() {
+        if (mailCc == null || mailCc.isBlank()) {
+            return new String[0];
+        }
+
+        return java.util.Arrays.stream(mailCc.split("[,;]"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toArray(String[]::new);
+    }
+
+    private String buildRfqPostingHtml(String tradeId, String description, String mode, String detailsUrl) {
+        String safeDescription = description == null || description.isBlank() ? "N/A" : description;
+        String safeMode = mode == null || mode.isBlank() ? "N/A" : mode;
+        return """
+                <html>
+                    <body style="margin:0;padding:0;background:#f6fbf8;font-family:'Segoe UI',Arial,sans-serif;">
+                        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="padding:24px 0;">
+                            <tr><td align="center">
+                                <table role="presentation" width="720" cellspacing="0" cellpadding="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.10);">
+                                    <tr><td style="padding:26px 32px;background:linear-gradient(120deg,#15803d,#166534);color:#fff;"><h2 style="margin:0;font-size:24px;">PAWFECT RFQ Activity Posted</h2></td></tr>
+                                    <tr><td style="padding:28px 32px;color:#1f2937;">
+                                        <p style="margin:0 0 12px;font-size:16px;">Dear Partner Vendor,</p>
+                                        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">A new Request for Quotation (RFQ) bearing Activity ID <strong>%s</strong> has been posted on the Pawfect Vendor Portal.</p>
+                                        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">Description: %s</p>
+                                        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">Mode: %s</p>
+                                        <p style="margin:0 0 18px;font-size:14px;line-height:1.7;">Please submit your quotation using the link below.</p>
+                                        <p style="margin:0 0 20px;"><a href="%s" style="display:inline-block;background:#166534;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">Open RFQ</a></p>
+                                    </td></tr>
+                                </table>
+                            </td></tr>
+                        </table>
+                    </body>
+                </html>
+                """.formatted(tradeId, safeDescription, safeMode, detailsUrl);
+    }
 
         private String buildVendorActivationHtml(String name, String activationUrl) {
                 String safeName = name == null || name.isBlank() ? "Vendor" : name;

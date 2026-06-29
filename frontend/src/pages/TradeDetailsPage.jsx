@@ -13,6 +13,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api/client';
@@ -44,6 +46,10 @@ export default function TradeDetailsPage({ session }) {
   const roles = session?.roles || [];
   const isAdminExecutive = roles.includes('ADMIN') || roles.includes('EXECUTIVE');
   const isVendor = roles.includes('VENDOR');
+  const theme = useTheme();
+  const isSm = useMediaQuery(theme.breakpoints.down('sm'));
+  const isFinalRound = trade?.currentRound >= 2;
+  const canFinalizeTrade = Boolean(trade && !trade.tradeClosed && bidBoard && !bidBoard.biddingOpen);
 
   const loadBidBoard = async () => {
     const bidBoardRes = await api.get(`/api/trades/${id}/bids/board`);
@@ -200,6 +206,7 @@ export default function TradeDetailsPage({ session }) {
               <Typography><strong>Created At:</strong> {trade.createdAt}</Typography>
               <Typography><strong>Bidding Status:</strong> {trade.biddingOpen ? 'OPEN' : 'CLOSED'}</Typography>
               <Typography><strong>Current Round:</strong> {trade.currentRound}</Typography>
+              <Typography><strong>Round Limit:</strong> R1 and R2 only</Typography>
               <Typography><strong>Final L1 Rate:</strong> {formatRate(trade.finalL1Rate)}</Typography>
             </Stack>
           </CardContent>
@@ -212,7 +219,12 @@ export default function TradeDetailsPage({ session }) {
             <Stack spacing={2}>
               <Typography variant="h6">Bidding Dashboard</Typography>
               {isAdminExecutive && (
-                <Stack direction="row" spacing={2}>
+                <Typography variant="body2" color="text.secondary">
+                  Round 1 can be finalized directly without starting round 2. Round 2 is the final round.
+                </Typography>
+              )}
+              {isAdminExecutive && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   {trade?.tradeClosed ? null : bidBoard.biddingOpen ? (
                     <Button
                       variant="contained"
@@ -220,25 +232,27 @@ export default function TradeDetailsPage({ session }) {
                       disabled={actionLoading}
                       sx={{ backgroundColor: '#c62828', '&:hover': { backgroundColor: '#a81f1f' } }}
                     >
-                      Close Round
+                      Close Round {trade?.currentRound || ''}
                     </Button>
                   ) : (
                     <>
-                      <Button
-                        variant="contained"
-                        onClick={startNextRound}
-                        disabled={actionLoading}
-                        sx={{ backgroundColor: '#1565c0', '&:hover': { backgroundColor: '#0f4f9a' } }}
-                      >
-                        Start Next Round
-                      </Button>
+                      {!isFinalRound && (
+                        <Button
+                          variant="contained"
+                          onClick={startNextRound}
+                          disabled={actionLoading}
+                          sx={{ backgroundColor: '#1565c0', '&:hover': { backgroundColor: '#0f4f9a' } }}
+                        >
+                          Start Round 2
+                        </Button>
+                      )}
                       <Button
                         variant="contained"
                         onClick={closeBid}
                         disabled={actionLoading}
                         sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
                       >
-                        Close Trade
+                        {canFinalizeTrade ? 'Finalize Trade' : 'Close Trade'}
                       </Button>
                     </>
                   )}
@@ -275,26 +289,43 @@ export default function TradeDetailsPage({ session }) {
               {isAdminExecutive && (
                 <Box>
                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>L1 / L2 / L3</Typography>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Rank</TableCell>
-                        <TableCell>Rate</TableCell>
-                        <TableCell>Vendor</TableCell>
-                        <TableCell>Company</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
+                  {isSm ? (
+                    <Stack spacing={1}>
                       {(bidBoard.leaderboard || []).map((item) => (
-                        <TableRow key={item.rank}>
-                          <TableCell>{item.rank}</TableCell>
-                          <TableCell>{formatRate(item.bidAmount)}</TableCell>
-                          <TableCell>{item.vendorName || 'Hidden during bidding'}</TableCell>
-                          <TableCell>{item.companyName || 'Hidden during bidding'}</TableCell>
-                        </TableRow>
+                        <Card key={item.rank} variant="outlined">
+                          <CardContent>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="subtitle2">Rank {item.rank}</Typography>
+                              <Typography variant="body2">{formatRate(item.bidAmount)}</Typography>
+                            </Stack>
+                            <Typography variant="body2" color="text.secondary">{item.vendorName || 'Hidden during bidding'}</Typography>
+                            <Typography variant="body2" color="text.secondary">{item.companyName || 'Hidden during bidding'}</Typography>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </Stack>
+                  ) : (
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Rank</TableCell>
+                          <TableCell>Rate</TableCell>
+                          <TableCell>Vendor</TableCell>
+                          <TableCell>Company</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(bidBoard.leaderboard || []).map((item) => (
+                          <TableRow key={item.rank}>
+                            <TableCell>{item.rank}</TableCell>
+                            <TableCell>{formatRate(item.bidAmount)}</TableCell>
+                            <TableCell>{item.vendorName || 'Hidden during bidding'}</TableCell>
+                            <TableCell>{item.companyName || 'Hidden during bidding'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </Box>
               )}
 
@@ -303,28 +334,48 @@ export default function TradeDetailsPage({ session }) {
                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
                     {isVendor ? 'Your Bids by Round' : 'All Vendor Bids'}
                   </Typography>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Round</TableCell>
-                        {!isVendor && <TableCell>Vendor</TableCell>}
-                        {!isVendor && <TableCell>Company</TableCell>}
-                        <TableCell>Rate</TableCell>
-                        <TableCell>Submitted At</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
+                  {isSm ? (
+                    <Stack spacing={1}>
                       {bidBoard.bidEntries.map((entry, idx) => (
-                        <TableRow key={`${entry.roundNumber}-${idx}-${entry.submittedAt}`}>
-                          <TableCell>{entry.roundNumber}</TableCell>
-                          {!isVendor && <TableCell>{entry.vendorName}</TableCell>}
-                          {!isVendor && <TableCell>{entry.companyName}</TableCell>}
-                          <TableCell>{formatRate(entry.bidAmount)}</TableCell>
-                          <TableCell>{entry.submittedAt}</TableCell>
-                        </TableRow>
+                        <Card key={`${entry.roundNumber}-${idx}-${entry.submittedAt}`} variant="outlined">
+                          <CardContent>
+                            <Stack spacing={0.5}>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="subtitle2">Round {entry.roundNumber}</Typography>
+                                <Typography variant="body2">{formatRate(entry.bidAmount)}</Typography>
+                              </Stack>
+                              {!isVendor && <Typography variant="body2" color="text.secondary">{entry.vendorName}</Typography>}
+                              {!isVendor && <Typography variant="body2" color="text.secondary">{entry.companyName}</Typography>}
+                              <Typography variant="caption" color="text.secondary">{entry.submittedAt}</Typography>
+                            </Stack>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </Stack>
+                  ) : (
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Round</TableCell>
+                          {!isVendor && <TableCell>Vendor</TableCell>}
+                          {!isVendor && <TableCell>Company</TableCell>}
+                          <TableCell>Rate</TableCell>
+                          <TableCell>Submitted At</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {bidBoard.bidEntries.map((entry, idx) => (
+                          <TableRow key={`${entry.roundNumber}-${idx}-${entry.submittedAt}`}>
+                            <TableCell>{entry.roundNumber}</TableCell>
+                            {!isVendor && <TableCell>{entry.vendorName}</TableCell>}
+                            {!isVendor && <TableCell>{entry.companyName}</TableCell>}
+                            <TableCell>{formatRate(entry.bidAmount)}</TableCell>
+                            <TableCell>{entry.submittedAt}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </Box>
               )}
             </Stack>

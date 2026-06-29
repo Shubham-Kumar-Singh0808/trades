@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      APP_FRONTEND_BASE_URL: ${APP_FRONTEND_BASE_URL}
+      APP_MAIL_FROM: ${APP_MAIL_FROM}
+      APP_MAIL_CC: ${APP_MAIL_CC}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      SPRING_MAIL_PROTOCOL: smtp
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SOCKETFACTORY_CLASS: javax.net.ssl.SSLSocketFactory
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SOCKETFACTORY_PORT: ${SPRING_MAIL_PORT}
+      APP_TRADE_AUTO_CLOSE_ZONE: ${APP_TRADE_AUTO_CLOSE_ZONE}
+      APP_TRADE_AUTO_CLOSE_HOUR: ${APP_TRADE_AUTO_CLOSE_HOUR}
+      APP_FILE_UPLOAD_DIR: /uploads/trades
+    volumes:
+      - ./uploads/trades:/uploads/trades
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db-data:
