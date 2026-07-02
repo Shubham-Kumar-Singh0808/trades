@@ -47,7 +47,7 @@ public class EmailService {
     public void sendVendorActivationEmail(String toEmail, String name, String token) {
         String activationUrl = verificationBaseUrl + token;
         String htmlBody = buildVendorActivationHtml(name, activationUrl);
-        sendHtmlEmail(toEmail, "Activate your PawfectFoods vendor account", htmlBody);
+        sendHtmlEmailNoCC(toEmail, "Activate your PawfectFoods vendor account", htmlBody);
     }
 
     public void sendVendorRegistrationPendingEmail(String toEmail, String name) {
@@ -129,19 +129,19 @@ public class EmailService {
     public void sendVendorPasswordSetupEmail(String toEmail, String name, String token) {
         String setupUrl = vendorPasswordSetupUrl + token;
         String htmlBody = buildVendorPasswordSetupHtml(name, setupUrl);
-        sendHtmlEmail(toEmail, "Set your PawfectFoods vendor password", htmlBody);
+        sendHtmlEmailNoCC(toEmail, "Set your PawfectFoods vendor password", htmlBody);
     }
 
     public void sendExecutivePasswordSetupEmail(String toEmail, String name, String token) {
         String setupUrl = vendorPasswordSetupUrl + token;
         String htmlBody = buildExecutivePasswordSetupHtml(name, setupUrl);
-        sendHtmlEmail(toEmail, "Set your PawfectFoods executive password", htmlBody);
+        sendHtmlEmailNoCC(toEmail, "Set your PawfectFoods executive password", htmlBody);
     }
 
     public void sendPasswordResetEmail(String toEmail, String name, String token) {
         String resetUrl = passwordResetUrl + token;
         String htmlBody = buildPasswordResetHtml(name, resetUrl);
-        sendHtmlEmail(toEmail, "Reset your PawfectFoods password", htmlBody);
+        sendHtmlEmailNoCC(toEmail, "Reset your PawfectFoods password", htmlBody);
     }
 
     public void sendTemporaryCredentialsEmail(
@@ -186,7 +186,7 @@ public class EmailService {
                     </body>
                 </html>
                 """.formatted(safeName, safeRole, toEmail, tempPassword, expiry);
-        sendHtmlEmail(toEmail, "Your temporary login credentials", htmlBody);
+        sendHtmlEmailNoCC(toEmail, "Your temporary login credentials", htmlBody);
     }
 
     public void sendTradeCreatedNotification(
@@ -236,7 +236,7 @@ public class EmailService {
                     </body>
                 </html>
                 """.formatted(ordinal, tradeId, detailsUrl);
-        sendHtmlEmail(toEmail, "RFQ submission confirmation - " + tradeId, htmlBody);
+        sendHtmlEmail(toEmail, "PAWFECT RFQ ACTIVITY ID " + tradeId, htmlBody);
     }
 
     public void sendTradeRoundClosedNotification(
@@ -274,7 +274,7 @@ public class EmailService {
                         </body>
                     </html>
                     """.formatted(roundNumber, roundNumber, tradeId, l1Text, detailsUrl);
-            sendHtmlEmail(recipient, subject, htmlBody);
+            sendHtmlEmail(recipient, "PAWFECT RFQ ACTIVITY ID " + tradeId, htmlBody);
         }
     }
 
@@ -309,7 +309,7 @@ public class EmailService {
                     </body>
                 </html>
                 """.formatted(safeName, tradeId, description, winningBidAmount, detailsUrl);
-        sendHtmlEmail(toEmail, "Tender result: You are L1 - " + tradeId, htmlBody);
+        sendHtmlEmail(toEmail, "PAWFECT RFQ ACTIVITY ID " + tradeId, htmlBody);
     }
 
     public void sendTradeBidReopenedNotification(
@@ -344,7 +344,7 @@ public class EmailService {
                         </body>
                     </html>
                     """.formatted(tradeId, roundNumber, previousRoundNumber, previousRoundL1Text, roundNumber, detailsUrl);
-            sendHtmlEmail(recipient, "Round " + roundNumber + " started - " + tradeId, htmlBody);
+            sendHtmlEmail(recipient, "PAWFECT RFQ ACTIVITY ID " + tradeId, htmlBody);
         }
     }
 
@@ -378,7 +378,7 @@ public class EmailService {
                 """.formatted(tradeId, safeDescription, roundsSummaryHtml);
 
         for (String recipient : recipients) {
-            sendHtmlEmail(recipient, "Tender summary - " + tradeId, htmlBody);
+            sendHtmlEmail(recipient, "PAWFECT RFQ ACTIVITY ID " + tradeId, htmlBody);
         }
     }
 
@@ -405,6 +405,21 @@ public class EmailService {
                         mailSender.send(mimeMessage);
                 } catch (Exception ex) {
                         log.warn("Failed to send HTML email to {}", toEmail, ex);
+                }
+        }
+
+        // Used for account-related emails that must not be CC'd to team aliases
+        private void sendHtmlEmailNoCC(String toEmail, String subject, String htmlBody) {
+                try {
+                        MimeMessage mimeMessage = mailSender.createMimeMessage();
+                        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, StandardCharsets.UTF_8.name());
+                        helper.setFrom(fromAddress);
+                        helper.setTo(toEmail);
+                        helper.setSubject(subject);
+                        helper.setText(htmlBody, true);
+                        mailSender.send(mimeMessage);
+                } catch (Exception ex) {
+                        log.warn("Failed to send HTML email (no-CC) to {}", toEmail, ex);
                 }
         }
 

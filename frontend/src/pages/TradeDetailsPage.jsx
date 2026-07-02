@@ -4,6 +4,13 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControlLabel,
   Stack,
   Table,
   TableBody,
@@ -20,10 +27,11 @@ import { useParams } from 'react-router-dom';
 import api from '../api/client';
 
 const getModeLabel = (mode) => {
-  if (mode === 'ONLINE') return 'DIRECT';
-  if (mode === 'DIRECT') return 'DIRECT';
-  if (mode === 'HYBRID') return 'HOPPING';
-  if (mode === 'HOPPING') return 'HOPPING';
+  if (mode === 'AIR') return 'Air';
+  if (mode === 'SEA') return 'Sea';
+  // Legacy aliases
+  if (mode === 'ONLINE' || mode === 'DIRECT') return 'Air';
+  if (mode === 'HYBRID' || mode === 'HOPPING' || mode === 'OFFLINE') return 'Sea';
   return mode;
 };
 
@@ -38,7 +46,14 @@ export default function TradeDetailsPage({ session }) {
   const { id } = useParams();
   const [trade, setTrade] = useState(null);
   const [bidBoard, setBidBoard] = useState(null);
-  const [bidAmount, setBidAmount] = useState('');
+  const [bidDialogOpen, setBidDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [termsDialogOpen, setTermsDialogOpen] = useState(false);
+  const [bidForm, setBidForm] = useState({
+    bidAmount: '', airlines: '', routing: '', comments: '',
+    ihcInr: '', thcInr: '', cfsInr: '', otherChargesComments: '',
+  });
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [jobSheetPdfUrl, setJobSheetPdfUrl] = useState('');
@@ -102,19 +117,52 @@ export default function TradeDetailsPage({ session }) {
   }, [id]);
 
   const submitBid = async () => {
-    if (!bidAmount) {
+    if (!bidForm.bidAmount) {
       setError('Please enter a bid amount.');
       return;
     }
+    if (!termsAccepted) {
+      setError('Please accept the Terms & Conditions before submitting.');
+      return;
+    }
+
+    const isAir = trade?.mode === 'AIR';
+    const payload = {
+      bidAmount: bidForm.bidAmount,
+      ...(isAir
+        ? { airlines: bidForm.airlines, routing: bidForm.routing, comments: bidForm.comments }
+        : {
+            ihcInr: bidForm.ihcInr || null,
+            thcInr: bidForm.thcInr || null,
+            cfsInr: bidForm.cfsInr || null,
+            otherChargesComments: bidForm.otherChargesComments,
+          }),
+    };
 
     setError('');
     setActionLoading(true);
     try {
-      await api.post(`/api/trades/${id}/bids`, { bidAmount });
-      setBidAmount('');
+      await api.post(`/api/trades/${id}/bids`, payload);
+      setBidForm({ bidAmount: '', airlines: '', routing: '', comments: '', ihcInr: '', thcInr: '', cfsInr: '', otherChargesComments: '' });
+      setTermsAccepted(false);
+      setBidDialogOpen(false);
       await Promise.all([loadBidBoard(), api.get(`/api/trades/${id}`).then((res) => setTrade(res.data))]);
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to submit bid');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const cancelTrade = async () => {
+    setError('');
+    setActionLoading(true);
+    try {
+      await api.patch(`/api/trades/${id}/cancel`);
+      await Promise.all([loadBidBoard(), api.get(`/api/trades/${id}`).then((res) => setTrade(res.data))]);
+      setCancelDialogOpen(false);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to cancel trade');
     } finally {
       setActionLoading(false);
     }
@@ -204,7 +252,7 @@ export default function TradeDetailsPage({ session }) {
               <Typography><strong>Description:</strong> {trade.description}</Typography>
               <Typography><strong>Created By:</strong> {trade.createdBy}</Typography>
               <Typography><strong>Created At:</strong> {trade.createdAt}</Typography>
-              <Typography><strong>Bidding Status:</strong> {trade.biddingOpen ? 'OPEN' : 'CLOSED'}</Typography>
+              <Typography><strong>Bidding Status:</strong> {trade.cancelled ? 'CANCELLED' : trade.biddingOpen ? 'OPEN' : 'CLOSED'}</Typography>
               <Typography><strong>Current Round:</strong> {trade.currentRound}</Typography>
               <Typography><strong>Round Limit:</strong> R1 and R2 only</Typography>
               <Typography><strong>Final L1 Rate:</strong> {formatRate(trade.finalL1Rate)}</Typography>
@@ -225,7 +273,9 @@ export default function TradeDetailsPage({ session }) {
               )}
               {isAdminExecutive && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  {trade?.tradeClosed ? null : bidBoard.biddingOpen ? (
+                  {trade?.cancelled ? (
+                    <Typography color="error" fontWeight={600}>This trade has been cancelled.</Typography>
+                  ) : trade?.tradeClosed ? null : bidBoard.biddingOpen ? (
                     <Button
                       variant="contained"
                       onClick={closeRound}
@@ -256,6 +306,16 @@ export default function TradeDetailsPage({ session }) {
                       </Button>
                     </>
                   )}
+                  {roles.includes('ADMIN') && !trade?.tradeClosed && !trade?.cancelled && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => setCancelDialogOpen(true)}
+                      disabled={actionLoading}
+                    >
+                      Cancel Trade
+                    </Button>
+                  )}
                 </Stack>
               )}
 
@@ -263,25 +323,16 @@ export default function TradeDetailsPage({ session }) {
                 <Stack spacing={2}>
                   <Typography><strong>Your Current Round Bid:</strong> {formatRate(bidBoard.myCurrentBid)}</Typography>
                   <Typography><strong>Final L1 Rate:</strong> {formatRate(bidBoard.finalL1Rate)}</Typography>
-                  {bidBoard.biddingOpen && (
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                      <TextField
-                        label="Your Bid (per kg)"
-                        value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
-                        type="number"
-                        inputProps={{ min: '0.0001', step: '0.0001' }}
-                        fullWidth
-                      />
+                  {bidBoard.biddingOpen && !trade?.cancelled && (
+                    <Box>
                       <Button
                         variant="contained"
-                        onClick={submitBid}
-                        disabled={actionLoading}
+                        onClick={() => setBidDialogOpen(true)}
                         sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}
                       >
                         Submit / Update Bid
                       </Button>
-                    </Stack>
+                    </Box>
                   )}
                 </Stack>
               )}
@@ -344,8 +395,15 @@ export default function TradeDetailsPage({ session }) {
                                 <Typography variant="subtitle2">Round {entry.roundNumber}</Typography>
                                 <Typography variant="body2">{formatRate(entry.bidAmount)}</Typography>
                               </Stack>
-                              {!isVendor && <Typography variant="body2" color="text.secondary">{entry.vendorName}</Typography>}
-                              {!isVendor && <Typography variant="body2" color="text.secondary">{entry.companyName}</Typography>}
+                              {!isVendor && entry.vendorName && <Typography variant="body2" color="text.secondary">{entry.vendorName}</Typography>}
+                              {!isVendor && entry.companyName && <Typography variant="body2" color="text.secondary">{entry.companyName}</Typography>}
+                              {entry.airlines && <Typography variant="body2" color="text.secondary">Airlines: {entry.airlines}</Typography>}
+                              {entry.routing && <Typography variant="body2" color="text.secondary">Routing: {entry.routing}</Typography>}
+                              {entry.comments && <Typography variant="body2" color="text.secondary">Comments: {entry.comments}</Typography>}
+                              {entry.ihcInr != null && <Typography variant="body2" color="text.secondary">IHC: ₹{entry.ihcInr}/ctr</Typography>}
+                              {entry.thcInr != null && <Typography variant="body2" color="text.secondary">THC: ₹{entry.thcInr}/ctr</Typography>}
+                              {entry.cfsInr != null && <Typography variant="body2" color="text.secondary">CFS: ₹{entry.cfsInr}/ctr</Typography>}
+                              {entry.otherChargesComments && <Typography variant="body2" color="text.secondary">Other: {entry.otherChargesComments}</Typography>}
                               <Typography variant="caption" color="text.secondary">{entry.submittedAt}</Typography>
                             </Stack>
                           </CardContent>
@@ -359,7 +417,21 @@ export default function TradeDetailsPage({ session }) {
                           <TableCell>Round</TableCell>
                           {!isVendor && <TableCell>Vendor</TableCell>}
                           {!isVendor && <TableCell>Company</TableCell>}
-                          <TableCell>Rate</TableCell>
+                          <TableCell>{trade?.mode === 'AIR' ? 'All-in/Kg (INR)' : 'Ocean Freight (USD)'}</TableCell>
+                          {trade?.mode === 'AIR' ? (
+                            <>
+                              <TableCell>Airlines</TableCell>
+                              <TableCell>Routing</TableCell>
+                              <TableCell>Comments</TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell>IHC (INR)</TableCell>
+                              <TableCell>THC (INR)</TableCell>
+                              <TableCell>CFS (INR)</TableCell>
+                              <TableCell>Other</TableCell>
+                            </>
+                          )}
                           <TableCell>Submitted At</TableCell>
                         </TableRow>
                       </TableHead>
@@ -367,9 +439,23 @@ export default function TradeDetailsPage({ session }) {
                         {bidBoard.bidEntries.map((entry, idx) => (
                           <TableRow key={`${entry.roundNumber}-${idx}-${entry.submittedAt}`}>
                             <TableCell>{entry.roundNumber}</TableCell>
-                            {!isVendor && <TableCell>{entry.vendorName}</TableCell>}
-                            {!isVendor && <TableCell>{entry.companyName}</TableCell>}
+                            {!isVendor && <TableCell>{entry.vendorName || '—'}</TableCell>}
+                            {!isVendor && <TableCell>{entry.companyName || '—'}</TableCell>}
                             <TableCell>{formatRate(entry.bidAmount)}</TableCell>
+                            {trade?.mode === 'AIR' ? (
+                              <>
+                                <TableCell>{entry.airlines || '—'}</TableCell>
+                                <TableCell>{entry.routing || '—'}</TableCell>
+                                <TableCell>{entry.comments || '—'}</TableCell>
+                              </>
+                            ) : (
+                              <>
+                                <TableCell>{entry.ihcInr != null ? `₹${entry.ihcInr}` : '—'}</TableCell>
+                                <TableCell>{entry.thcInr != null ? `₹${entry.thcInr}` : '—'}</TableCell>
+                                <TableCell>{entry.cfsInr != null ? `₹${entry.cfsInr}` : '—'}</TableCell>
+                                <TableCell>{entry.otherChargesComments || '—'}</TableCell>
+                              </>
+                            )}
                             <TableCell>{entry.submittedAt}</TableCell>
                           </TableRow>
                         ))}
@@ -419,6 +505,180 @@ export default function TradeDetailsPage({ session }) {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Bid Submission Dialog */}
+      <Dialog open={bidDialogOpen} onClose={() => setBidDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Submit Bid — {trade?.mode === 'AIR' ? 'Air' : 'Sea'} Mode</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {trade?.mode === 'AIR' ? (
+              <>
+                <TextField
+                  label="All-in Rate (INR / Kg)"
+                  helperText="Covers Local Clearance, THC, AWB, SB, AMS, Air Freight from origin to destination port"
+                  value={bidForm.bidAmount}
+                  onChange={(e) => setBidForm((p) => ({ ...p, bidAmount: e.target.value }))}
+                  type="number"
+                  inputProps={{ min: '0.0001', step: '0.0001' }}
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="Airlines"
+                  value={bidForm.airlines}
+                  onChange={(e) => setBidForm((p) => ({ ...p, airlines: e.target.value }))}
+                  fullWidth
+                />
+                <TextField
+                  label="Routing (POL → POD → via)"
+                  helperText={
+                    <span>
+                      * Please mention the POL, POD, Routing via (if hopping)<br />
+                      All consignments intended for the European region must be routed directly to the declared Final Port of Destination. The First Port of Entry into Europe and the Final Port must be the same. Any diversion, transloading, trucking or port-hopping within Europe shall not be permitted. Deviance to this rule will lead to the quoting partner absorbing the return cost of the consignment.
+                    </span>
+                  }
+                  value={bidForm.routing}
+                  onChange={(e) => setBidForm((p) => ({ ...p, routing: e.target.value }))}
+                  fullWidth
+                  multiline
+                  minRows={2}
+                />
+                <TextField
+                  label="Comments"
+                  value={bidForm.comments}
+                  onChange={(e) => setBidForm((p) => ({ ...p, comments: e.target.value }))}
+                  fullWidth
+                  multiline
+                  minRows={2}
+                />
+              </>
+            ) : (
+              <>
+                <TextField
+                  label="Ocean Freight (USD / container)"
+                  value={bidForm.bidAmount}
+                  onChange={(e) => setBidForm((p) => ({ ...p, bidAmount: e.target.value }))}
+                  type="number"
+                  inputProps={{ min: '0.0001', step: '0.01' }}
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="IHC (INR / container)"
+                  value={bidForm.ihcInr}
+                  onChange={(e) => setBidForm((p) => ({ ...p, ihcInr: e.target.value }))}
+                  type="number"
+                  inputProps={{ min: '0', step: '1' }}
+                  fullWidth
+                />
+                <TextField
+                  label="THC (INR / container)"
+                  value={bidForm.thcInr}
+                  onChange={(e) => setBidForm((p) => ({ ...p, thcInr: e.target.value }))}
+                  type="number"
+                  inputProps={{ min: '0', step: '1' }}
+                  fullWidth
+                />
+                <TextField
+                  label="CFS (INR / container)"
+                  value={bidForm.cfsInr}
+                  onChange={(e) => setBidForm((p) => ({ ...p, cfsInr: e.target.value }))}
+                  type="number"
+                  inputProps={{ min: '0', step: '1' }}
+                  fullWidth
+                />
+                <TextField
+                  label="Other Charges — Comments"
+                  helperText="Specify any additional charges not listed above"
+                  value={bidForm.otherChargesComments}
+                  onChange={(e) => setBidForm((p) => ({ ...p, otherChargesComments: e.target.value }))}
+                  fullWidth
+                  multiline
+                  minRows={2}
+                />
+              </>
+            )}
+            <Divider />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  sx={{ color: '#3a8a3a', '&.Mui-checked': { color: '#3a8a3a' } }}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  I acknowledge and confirm that I have read and agree to the{' '}
+                  <Box
+                    component="span"
+                    sx={{ color: '#1565c0', cursor: 'pointer', textDecoration: 'underline' }}
+                    onClick={(e) => { e.preventDefault(); setTermsDialogOpen(true); }}
+                  >
+                    Terms &amp; Conditions
+                  </Box>
+                  .
+                </Typography>
+              }
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBidDialogOpen(false)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button
+            onClick={submitBid}
+            variant="contained"
+            disabled={actionLoading || !termsAccepted}
+            sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}
+          >
+            Submit Bid
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Terms & Conditions Dialog */}
+      <Dialog open={termsDialogOpen} onClose={() => setTermsDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Terms &amp; Conditions</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            {[
+              { title: '1. All-In Freight Rate', body: 'The quoted All-in per Kg rate shall include Local Clearance Charges, Terminal Handling Charges (THC), Airway Bill Charges, Shipping Bill Charges, AMS (Automated Manifest System) Filing Charges, and Air Freight Charges. The rate covers all costs from origin customs clearance up to the destination port unless otherwise specified in writing.' },
+              { title: '2. European Shipment Routing Restriction', body: 'All consignments intended for the European region must be routed directly to the declared Final Port of Destination. The First Port of Entry into Europe and the Final Port must remain the same. Any diversion, transshipment, transloading, trucking or port-hopping within Europe shall not be permitted. Deviance to this rule will lead to the quoting partner absorbing the return cost of the consignment.' },
+              { title: '3. Master Airway Bill Requirement', body: 'Shipments shall move under a Master Airway Bill (MAWB) only, unless specifically instructed in writing by Pawfect Pet Foods Private Limited to involve a House Airway Bill (HAWB).' },
+              { title: '4. Airway Bill Amendment Restriction', body: 'Once the Airway Bill (AWB) has been issued and the Health Certificate has been obtained, the AWB number must not be changed. Since the AWB number is mentioned on the Health Certificate for shipment identification purposes, any amendment after issuance of the Health Certificate may result in customs clearance delays or rejection. Any charges, penalties, or expenses incurred due to AWB changes shall be solely borne by the handling agent or freight forwarder responsible for such amendment.' },
+              { title: '5. DDP / Destination Clearance Notification Requirement', body: 'In case of DDP shipments or destination customs clearance arrangements, the handling forwarder and/or customs broker must notify the consignee and the respective warehouse at least 24–36 hours prior to cargo arrival or delivery scheduling. Failure to provide the required advance notice may result in late alert charges, storage charges, redelivery charges, or appointment rescheduling charges. Pawfect Pet Foods Private Limited shall bear no responsibility for such charges, and the same shall be solely borne by the handling agent and/or destination handling forwarder.' },
+              { title: '6. Miscellaneous Charges', body: 'Any miscellaneous, additional, or unexpected charges not previously agreed upon shall require prior written approval from Pawfect Pet Foods Private Limited before being incurred or invoiced.' },
+              { title: '7. No Unauthorized Shipment Hold', body: 'Cargo shall not be held, delayed, or withheld for payment disputes or operational issues without prior written consent from Pawfect Pet Foods Private Limited. Any unauthorized hold will lead to a 10% consignment value penalty on the quoting freight partner.' },
+              { title: '8. Jurisdiction', body: 'All disputes, claims, or legal proceedings arising out of or in connection with these terms shall be subject to the exclusive jurisdiction of the competent courts of Delhi, India.' },
+            ].map((clause) => (
+              <Box key={clause.title}>
+                <Typography variant="subtitle2" fontWeight={700}>{clause.title}</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5, lineHeight: 1.7 }}>{clause.body}</Typography>
+              </Box>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setTermsDialogOpen(false); setTermsAccepted(true); }} variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>
+            I Agree
+          </Button>
+          <Button onClick={() => setTermsDialogOpen(false)} sx={{ color: '#666' }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancel Trade Confirmation Dialog */}
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Cancel Trade</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to cancel trade <strong>{trade?.tradeId}</strong>? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialogOpen(false)} sx={{ color: '#666' }}>No, Go Back</Button>
+          <Button onClick={cancelTrade} variant="contained" color="error" disabled={actionLoading}>
+            Yes, Cancel Trade
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

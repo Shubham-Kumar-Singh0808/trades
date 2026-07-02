@@ -60,6 +60,29 @@ public class TradeBid {
     @Column(nullable = false, precision = 12, scale = 4)
     private BigDecimal bidAmount;
 
+    // Air-mode fields
+    @Column(length = 500)
+    private String airlines;
+
+    @Column(length = 500)
+    private String routing;
+
+    @Column(length = 1000)
+    private String comments;
+
+    // Sea-mode fields
+    @Column(precision = 12, scale = 4)
+    private BigDecimal ihcInr;
+
+    @Column(precision = 12, scale = 4)
+    private BigDecimal thcInr;
+
+    @Column(precision = 12, scale = 4)
+    private BigDecimal cfsInr;
+
+    @Column(length = 1000)
+    private String otherChargesComments;
+
     @Column(nullable = false)
     private Instant submittedAt;
 

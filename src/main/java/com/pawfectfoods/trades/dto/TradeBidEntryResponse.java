@@ -8,6 +8,13 @@ public record TradeBidEntryResponse(
         String vendorName,
         String companyName,
         BigDecimal bidAmount,
+        String airlines,
+        String routing,
+        String comments,
+        BigDecimal ihcInr,
+        BigDecimal thcInr,
+        BigDecimal cfsInr,
+        String otherChargesComments,
         Instant submittedAt
 ) {
 }

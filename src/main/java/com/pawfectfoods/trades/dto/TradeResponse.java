@@ -15,6 +15,7 @@ public record TradeResponse(
         boolean biddingOpen,
         int currentRound,
         boolean tradeClosed,
+        boolean cancelled,
         BigDecimal finalL1Rate,
         Instant createdAt,
         Instant autoCloseAt,

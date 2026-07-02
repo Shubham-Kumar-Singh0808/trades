@@ -5,6 +5,13 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record BidSubmitRequest(
-        @NotNull @DecimalMin(value = "0.0001") BigDecimal bidAmount
+        @NotNull @DecimalMin(value = "0.0001") BigDecimal bidAmount,
+        String airlines,
+        String routing,
+        String comments,
+        BigDecimal ihcInr,
+        BigDecimal thcInr,
+        BigDecimal cfsInr,
+        String otherChargesComments
 ) {
 }

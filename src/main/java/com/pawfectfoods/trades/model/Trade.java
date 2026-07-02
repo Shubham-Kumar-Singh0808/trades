@@ -1,9 +1,8 @@
 package com.pawfectfoods.trades.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -44,7 +43,7 @@ public class Trade {
     @Column(nullable = false, unique = true)
     private String tradeId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = TradeModeConverter.class)
     @Column(nullable = false)
     private TradeMode mode;
 
@@ -76,6 +75,10 @@ public class Trade {
     private int currentRound = 1;
 
     private Instant closedAt;
+
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "boolean not null default false")
+    private boolean cancelled = false;
 
     @Column(precision = 12, scale = 4)
     private BigDecimal finalL1Rate;

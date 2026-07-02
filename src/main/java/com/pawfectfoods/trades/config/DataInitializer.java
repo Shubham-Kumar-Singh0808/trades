@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,13 +36,25 @@ public class DataInitializer implements ApplicationRunner {
     private final TradeRepository tradeRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppBootstrapProperties bootstrapProperties;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        fixTradeModeConstraint();
         initializeRoles();
         initializeAdminUser();
         backfillTradeAutoCloseAt();
+    }
+
+    private void fixTradeModeConstraint() {
+        try {
+            // Drop the old check constraint that only allowed ONLINE/OFFLINE/HYBRID
+            jdbcTemplate.execute("ALTER TABLE trade DROP CONSTRAINT IF EXISTS trade_mode_check");
+            log.info("Dropped legacy trade_mode_check constraint (if it existed)");
+        } catch (Exception e) {
+            log.warn("Could not drop trade_mode_check constraint: {}", e.getMessage());
+        }
     }
 
     private void initializeRoles() {

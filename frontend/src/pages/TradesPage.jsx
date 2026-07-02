@@ -29,8 +29,11 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 
 const getModeLabel = (mode) => {
-  if (mode === 'ONLINE') return 'DIRECT';
-  if (mode === 'HYBRID') return 'HOPPING';
+  if (mode === 'AIR') return 'Air';
+  if (mode === 'SEA') return 'Sea';
+  // Legacy aliases
+  if (mode === 'ONLINE' || mode === 'DIRECT') return 'Air';
+  if (mode === 'HYBRID' || mode === 'HOPPING' || mode === 'OFFLINE') return 'Sea';
   return mode;
 };
 
@@ -45,7 +48,7 @@ export default function TradesPage({ session }) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
     tradeId: '',
-    mode: 'DIRECT',
+    mode: 'AIR',
     description: '',
     notificationScope: 'ALL_ACTIVE',
     vendorIds: [],
@@ -134,7 +137,7 @@ export default function TradesPage({ session }) {
       formData.append('trackingListFile', form.trackingListFile);
 
       await api.post('/api/trades', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setForm({ tradeId: '', mode: 'DIRECT', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], jobSheetFile: null, trackingListFile: null });
+      setForm({ tradeId: '', mode: 'AIR', description: '', notificationScope: 'ALL_ACTIVE', vendorIds: [], jobSheetFile: null, trackingListFile: null });
       setCreateModalOpen(false);
       loadTrades(1);
     } catch (err) {
@@ -174,8 +177,8 @@ export default function TradesPage({ session }) {
               <InputLabel>Mode</InputLabel>
               <Select value={modeFilter} label="Mode" onChange={(e) => setModeFilter(e.target.value)}>
                 <MenuItem value="ALL">All Modes</MenuItem>
-                <MenuItem value="DIRECT">DIRECT</MenuItem>
-                <MenuItem value="HOPPING">HOPPING</MenuItem>
+                <MenuItem value="AIR">Air</MenuItem>
+                <MenuItem value="SEA">Sea</MenuItem>
               </Select>
             </FormControl>
             <FormControl fullWidth>
@@ -273,8 +276,8 @@ export default function TradesPage({ session }) {
               <FormControl fullWidth>
                 <InputLabel>Mode</InputLabel>
                 <Select value={form.mode} label="Mode" onChange={(e) => setForm((p) => ({ ...p, mode: e.target.value }))}>
-                  <MenuItem value="DIRECT">DIRECT</MenuItem>
-                  <MenuItem value="HOPPING">HOPPING</MenuItem>
+                  <MenuItem value="AIR">Air</MenuItem>
+                  <MenuItem value="SEA">Sea</MenuItem>
                 </Select>
               </FormControl>
             </Stack>

@@ -136,6 +136,13 @@ public class TradeService {
                 .build());
 
         bid.setBidAmount(request.bidAmount());
+        bid.setAirlines(request.airlines());
+        bid.setRouting(request.routing());
+        bid.setComments(request.comments());
+        bid.setIhcInr(request.ihcInr());
+        bid.setThcInr(request.thcInr());
+        bid.setCfsInr(request.cfsInr());
+        bid.setOtherChargesComments(request.otherChargesComments());
         bid.setUpdatedAt(now);
         tradeBidRepository.save(bid);
 
@@ -183,11 +190,14 @@ public class TradeService {
                 "Trade not found"));
 
         if (hasRole(currentUser, RoleName.ADMIN) || hasRole(currentUser, RoleName.EXECUTIVE)) {
-            List<TradeBidRankResponse> leaderboard = buildLeaderboard(trade, trade.isBiddingOpen());
+            boolean isAdmin = hasRole(currentUser, RoleName.ADMIN);
+            // ADMIN sees vendor identity after round closes; EXECUTIVE always sees only rates
+            boolean hideIdentity = !isAdmin || trade.isBiddingOpen();
+            List<TradeBidRankResponse> leaderboard = buildLeaderboard(trade, hideIdentity);
             List<TradeBidEntryResponse> entries = trade.isBiddingOpen()
                 ? List.of()
                     : tradeBidRepository.findByTrade_IdOrderByRoundNumberAscBidAmountAscUpdatedAtAsc(tradeId).stream()
-                    .map(this::toBidEntry)
+                    .map(isAdmin ? this::toBidEntry : this::toBidEntryAnonymous)
                     .toList();
 
             return new TradeBidBoardResponse(
@@ -220,6 +230,13 @@ public class TradeService {
                 null,
                 null,
                 b.getBidAmount(),
+                b.getAirlines(),
+                b.getRouting(),
+                b.getComments(),
+                b.getIhcInr(),
+                b.getThcInr(),
+                b.getCfsInr(),
+                b.getOtherChargesComments(),
                 b.getUpdatedAt()))
             .toList();
 
@@ -297,6 +314,30 @@ public class TradeService {
         }
 
         return new MessageResponse("Trade closed successfully.");
+    }
+
+    @Transactional
+    public MessageResponse cancelTrade(UUID tradeId) {
+        Trade trade = tradeRepository.findById(tradeId)
+            .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ErrorCode.TRADE_NOT_FOUND,
+                "Trade not found"));
+
+        if (trade.isCancelled()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_ALREADY_CANCELLED,
+                "Trade is already cancelled");
+        }
+
+        if (trade.getClosedAt() != null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BIDDING_ALREADY_CLOSED,
+                "Trade is already closed");
+        }
+
+        trade.setClosedAt(Instant.now());
+        trade.setBiddingOpen(false);
+        trade.setCancelled(true);
+        tradeRepository.save(trade);
+
+        return new MessageResponse("Trade cancelled successfully.");
     }
 
     @Transactional
@@ -595,6 +636,29 @@ public class TradeService {
                 bid.getVendor().getName(),
                 bid.getVendor().getCompanyName(),
                 bid.getBidAmount(),
+                bid.getAirlines(),
+                bid.getRouting(),
+                bid.getComments(),
+                bid.getIhcInr(),
+                bid.getThcInr(),
+                bid.getCfsInr(),
+                bid.getOtherChargesComments(),
+                bid.getUpdatedAt());
+    }
+
+    private TradeBidEntryResponse toBidEntryAnonymous(TradeBid bid) {
+        return new TradeBidEntryResponse(
+                bid.getRoundNumber(),
+                null,
+                null,
+                bid.getBidAmount(),
+                bid.getAirlines(),
+                bid.getRouting(),
+                bid.getComments(),
+                bid.getIhcInr(),
+                bid.getThcInr(),
+                bid.getCfsInr(),
+                bid.getOtherChargesComments(),
                 bid.getUpdatedAt());
     }
 
@@ -654,6 +718,7 @@ public class TradeService {
                 trade.isBiddingOpen(),
                 trade.getCurrentRound(),
                 trade.getClosedAt() != null,
+                trade.isCancelled(),
                 trade.getFinalL1Rate(),
                 trade.getCreatedAt(),
                 trade.getAutoCloseAt(),
@@ -664,11 +729,9 @@ public class TradeService {
         if (mode == null) {
             return "N/A";
         }
-
         return switch (mode) {
-            case ONLINE -> "DIRECT";
-            case HYBRID -> "HOPPING";
-            case OFFLINE -> "OFFLINE";
+            case AIR -> "Air";
+            case SEA -> "Sea";
         };
     }
 }

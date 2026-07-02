@@ -108,6 +108,12 @@ public class TradeController {
     public ResponseEntity<MessageResponse> reopenBid(@PathVariable UUID id) {
         return ResponseEntity.ok(tradeService.reopenBid(id));
     }
+
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MessageResponse> cancelTrade(@PathVariable UUID id) {
+        return ResponseEntity.ok(tradeService.cancelTrade(id));
+    }
     
     @GetMapping(value = "/{id}/view", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE','VENDOR')")

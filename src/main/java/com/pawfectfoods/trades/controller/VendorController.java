@@ -40,7 +40,7 @@ public class VendorController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE','VENDOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
     public ResponseEntity<Page<VendorResponse>> getAllVendors(
             @PageableDefault(sort = "name") Pageable pageable) {
         return ResponseEntity.ok(vendorService.getAllVendors(pageable));

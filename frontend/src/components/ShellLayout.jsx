@@ -78,7 +78,7 @@ export default function ShellLayout({ onLogout, children, session }) {
 
   const navItems = [
     ...(roles.includes('ADMIN') ? [{ to: '/users', label: 'Users' }] : []),
-    {
+    ...(canReviewRequests ? [{
       label: 'Vendor',
       submenu: [
         { to: '/vendors', label: 'All Vendors' },
@@ -91,7 +91,7 @@ export default function ShellLayout({ onLogout, children, session }) {
           label: `Profile Changes${profileChangeCount != null ? ` (${profileChangeCount})` : ''}`,
         },
       ],
-    },
+    }] : []),
     { to: '/trades', label: 'Trades' },
   ];
 
