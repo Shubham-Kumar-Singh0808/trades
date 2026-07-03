@@ -266,7 +266,7 @@ public class TradeService {
     }
 
     @Transactional
-    public MessageResponse closeBid(UUID tradeId) {
+    public MessageResponse closeBid(UUID tradeId, UUID winnerBidId) {
         Trade trade = tradeRepository.findById(tradeId)
             .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ErrorCode.TRADE_NOT_FOUND,
                 "Trade not found"));
@@ -281,23 +281,31 @@ public class TradeService {
                 "Close current round first, then close trade");
         }
 
-        TradeBid winningBid = tradeBidRepository
-            .findFirstByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(tradeId, trade.getCurrentRound())
-            .orElse(null);
+        TradeBid winningBid = tradeBidRepository.findById(winnerBidId)
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BID_NOT_FOUND,
+                "Selected winner bid not found"));
+
+        if (!winningBid.getTrade().getId().equals(tradeId)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BID_NOT_FOUND,
+                "Selected bid does not belong to this trade");
+        }
+
+        if (winningBid.getRoundNumber() != trade.getCurrentRound()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BID_NOT_FOUND,
+                "Selected bid is not from the current round");
+        }
 
         trade.setClosedAt(Instant.now());
-        trade.setFinalL1Rate(winningBid == null ? null : winningBid.getBidAmount());
+        trade.setFinalL1Rate(winningBid.getBidAmount());
         trade.setBiddingOpen(false);
         tradeRepository.save(trade);
 
-        if (winningBid != null) {
-            emailService.sendTradeBidWinnerNotification(
-                winningBid.getVendor().getEmail(),
-                winningBid.getVendor().getName(),
-                trade.getTradeId(),
-                trade.getDescription(),
-                winningBid.getBidAmount());
-        }
+        emailService.sendTradeBidWinnerNotification(
+            winningBid.getVendor().getEmail(),
+            winningBid.getVendor().getName(),
+            trade.getTradeId(),
+            trade.getDescription(),
+            winningBid.getBidAmount());
 
         List<String> adminRecipients = appUserRepository.findDistinctByRoles_Name(RoleName.ADMIN).stream()
             .map(AppUser::getEmail)
@@ -619,9 +627,14 @@ public class TradeService {
             TradeBid bid = roundBids.get(i);
             leaderboard.add(new TradeBidRankResponse(
                     ranks.get(i),
+                    bid.getId(),
                     bid.getBidAmount(),
                     hideVendorIdentity ? null : bid.getVendor().getName(),
-                    hideVendorIdentity ? null : bid.getVendor().getCompanyName()));
+                    hideVendorIdentity ? null : bid.getVendor().getCompanyName(),
+                    bid.getIhcInr(),
+                    bid.getThcInr(),
+                    bid.getCfsInr(),
+                    bid.getOtherChargesComments()));
         }
         return leaderboard;
     }

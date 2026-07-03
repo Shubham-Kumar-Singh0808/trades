@@ -251,7 +251,6 @@ public class EmailService {
         }
 
         String l1Text = l1Rate == null ? "N/A" : l1Rate.toPlainString();
-        String subject = "PAWFECT RFQ ROUND " + roundNumber + " CLOSED - Activity ID " + tradeId;
 
         for (String recipient : recipients) {
             String htmlBody = """

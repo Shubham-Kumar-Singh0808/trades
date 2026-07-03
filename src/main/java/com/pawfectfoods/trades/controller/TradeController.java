@@ -2,6 +2,7 @@ package com.pawfectfoods.trades.controller;
 
 import com.pawfectfoods.trades.dto.CreateTradeRequest;
 import com.pawfectfoods.trades.dto.BidSubmitRequest;
+import com.pawfectfoods.trades.dto.FinalizeTradeRequest;
 import com.pawfectfoods.trades.dto.MessageResponse;
 import com.pawfectfoods.trades.dto.TradeBidBoardResponse;
 import com.pawfectfoods.trades.dto.TradeBidRankResponse;
@@ -86,25 +87,27 @@ public class TradeController {
     }
 
     @PatchMapping("/{id}/bids/close")
-    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
-    public ResponseEntity<MessageResponse> closeBid(@PathVariable UUID id) {
-        return ResponseEntity.ok(tradeService.closeBid(id));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MessageResponse> closeBid(
+            @PathVariable UUID id,
+            @Valid @RequestBody FinalizeTradeRequest request) {
+        return ResponseEntity.ok(tradeService.closeBid(id, request.winnerBidId()));
     }
 
     @PatchMapping("/{id}/bids/round/close")
-    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> closeRound(@PathVariable UUID id) {
         return ResponseEntity.ok(tradeService.closeRound(id));
     }
 
     @PatchMapping("/{id}/bids/next-round")
-    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> startNextRound(@PathVariable UUID id) {
         return ResponseEntity.ok(tradeService.startNextRound(id));
     }
 
     @PatchMapping("/{id}/bids/reopen")
-    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> reopenBid(@PathVariable UUID id) {
         return ResponseEntity.ok(tradeService.reopenBid(id));
     }

@@ -35,11 +35,11 @@ const getModeLabel = (mode) => {
   return mode;
 };
 
-const formatRate = (value) => {
+const formatRate = (value, isUsd = false) => {
   if (value === null || value === undefined || value === '') {
     return 'N/A';
   }
-  return `Rs. ${value}`;
+  return isUsd ? `$${value}` : `Rs. ${value}`;
 };
 
 export default function TradeDetailsPage({ session }) {
@@ -48,6 +48,7 @@ export default function TradeDetailsPage({ session }) {
   const [bidBoard, setBidBoard] = useState(null);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
   const [termsDialogOpen, setTermsDialogOpen] = useState(false);
   const [bidForm, setBidForm] = useState({
     bidAmount: '', airlines: '', routing: '', comments: '',
@@ -60,6 +61,7 @@ export default function TradeDetailsPage({ session }) {
   const [trackingListPdfUrl, setTrackingListPdfUrl] = useState('');
   const roles = session?.roles || [];
   const isAdminExecutive = roles.includes('ADMIN') || roles.includes('EXECUTIVE');
+  const isAdmin = roles.includes('ADMIN');
   const isVendor = roles.includes('VENDOR');
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down('sm'));
@@ -168,14 +170,15 @@ export default function TradeDetailsPage({ session }) {
     }
   };
 
-  const closeBid = async () => {
+  const closeBid = async (winnerBidId) => {
     setError('');
     setActionLoading(true);
     try {
-      await api.patch(`/api/trades/${id}/bids/close`);
+      await api.patch(`/api/trades/${id}/bids/close`, { winnerBidId });
       await Promise.all([loadBidBoard(), api.get(`/api/trades/${id}`).then((res) => setTrade(res.data))]);
+      setFinalizeDialogOpen(false);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to close bid');
+      setError(err?.response?.data?.message || 'Failed to finalize trade');
     } finally {
       setActionLoading(false);
     }
@@ -271,7 +274,7 @@ export default function TradeDetailsPage({ session }) {
                   Round 1 can be finalized directly without starting round 2. Round 2 is the final round.
                 </Typography>
               )}
-              {isAdminExecutive && (
+              {isAdmin && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   {trade?.cancelled ? (
                     <Typography color="error" fontWeight={600}>This trade has been cancelled.</Typography>
@@ -298,7 +301,7 @@ export default function TradeDetailsPage({ session }) {
                       )}
                       <Button
                         variant="contained"
-                        onClick={closeBid}
+                        onClick={() => setFinalizeDialogOpen(true)}
                         disabled={actionLoading}
                         sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
                       >
@@ -306,7 +309,7 @@ export default function TradeDetailsPage({ session }) {
                       </Button>
                     </>
                   )}
-                  {roles.includes('ADMIN') && !trade?.tradeClosed && !trade?.cancelled && (
+                  {!trade?.tradeClosed && !trade?.cancelled && (
                     <Button
                       variant="outlined"
                       color="error"
@@ -360,7 +363,13 @@ export default function TradeDetailsPage({ session }) {
                       <TableHead>
                         <TableRow>
                           <TableCell>Rank</TableCell>
-                          <TableCell>Rate</TableCell>
+                          <TableCell>{trade?.mode === 'SEA' ? 'Ocean Freight (USD)' : 'Rate (INR)'}</TableCell>
+                          {trade?.mode === 'SEA' && <>
+                            <TableCell>IHC (INR)</TableCell>
+                            <TableCell>THC (INR)</TableCell>
+                            <TableCell>CFS (INR)</TableCell>
+                            <TableCell>Other Charges</TableCell>
+                          </>}
                           <TableCell>Vendor</TableCell>
                           <TableCell>Company</TableCell>
                         </TableRow>
@@ -369,7 +378,13 @@ export default function TradeDetailsPage({ session }) {
                         {(bidBoard.leaderboard || []).map((item) => (
                           <TableRow key={item.rank}>
                             <TableCell>{item.rank}</TableCell>
-                            <TableCell>{formatRate(item.bidAmount)}</TableCell>
+                            <TableCell>{formatRate(item.bidAmount, trade?.mode === 'SEA')}</TableCell>
+                            {trade?.mode === 'SEA' && <>
+                              <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
+                              <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
+                              <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
+                              <TableCell>{item.otherChargesComments || '—'}</TableCell>
+                            </>}
                             <TableCell>{item.vendorName || 'Hidden during bidding'}</TableCell>
                             <TableCell>{item.companyName || 'Hidden during bidding'}</TableCell>
                           </TableRow>
@@ -441,7 +456,7 @@ export default function TradeDetailsPage({ session }) {
                             <TableCell>{entry.roundNumber}</TableCell>
                             {!isVendor && <TableCell>{entry.vendorName || '—'}</TableCell>}
                             {!isVendor && <TableCell>{entry.companyName || '—'}</TableCell>}
-                            <TableCell>{formatRate(entry.bidAmount)}</TableCell>
+                            <TableCell>{formatRate(entry.bidAmount, trade?.mode === 'SEA')}</TableCell>
                             {trade?.mode === 'AIR' ? (
                               <>
                                 <TableCell>{entry.airlines || '—'}</TableCell>
@@ -633,6 +648,67 @@ export default function TradeDetailsPage({ session }) {
           >
             Submit Bid
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Finalize Trade — Select Winner Dialog */}
+      <Dialog open={finalizeDialogOpen} onClose={() => setFinalizeDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Finalize Trade — Select Winner</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }} color="text.secondary">
+            Review the current leaderboard and confirm your selected freight forwarder. This action will close the tender and notify the selected vendor.
+          </Typography>
+          {(bidBoard?.leaderboard || []).length === 0 ? (
+            <Typography color="error">No bids available to finalize.</Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Rank</TableCell>
+                  <TableCell>{trade?.mode === 'SEA' ? 'Ocean Freight (USD)' : 'Rate (INR)'}</TableCell>
+                  {trade?.mode === 'SEA' && <>
+                    <TableCell>IHC (INR)</TableCell>
+                    <TableCell>THC (INR)</TableCell>
+                    <TableCell>CFS (INR)</TableCell>
+                    <TableCell>Other</TableCell>
+                  </>}
+                  <TableCell>Vendor</TableCell>
+                  <TableCell>Company</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(bidBoard?.leaderboard || []).map((item) => (
+                  <TableRow key={item.rank}>
+                    <TableCell><strong>{item.rank}</strong></TableCell>
+                    <TableCell>{formatRate(item.bidAmount, trade?.mode === 'SEA')}</TableCell>
+                    {trade?.mode === 'SEA' && <>
+                      <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
+                      <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
+                      <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
+                      <TableCell>{item.otherChargesComments || '—'}</TableCell>
+                    </>}
+                    <TableCell>{item.vendorName || '—'}</TableCell>
+                    <TableCell>{item.companyName || '—'}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => closeBid(item.bidId)}
+                        disabled={actionLoading}
+                        sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' }, whiteSpace: 'nowrap' }}
+                      >
+                        Confirm as Winner
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFinalizeDialogOpen(false)} sx={{ color: '#666' }}>Cancel</Button>
         </DialogActions>
       </Dialog>
 
