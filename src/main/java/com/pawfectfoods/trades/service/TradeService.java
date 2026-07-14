@@ -56,6 +56,7 @@ public class TradeService {
     private final FileStorageService fileStorageService;
     private final PdfWatermarkService pdfWatermarkService;
     private final EmailService emailService;
+    private final ExchangeRateService exchangeRateService;
 
     @Value("${app.frontend.base-url:http://localhost:4000}")
     private String frontendBaseUrl;
@@ -191,13 +192,13 @@ public class TradeService {
 
         if (hasRole(currentUser, RoleName.ADMIN) || hasRole(currentUser, RoleName.EXECUTIVE)) {
             boolean isAdmin = hasRole(currentUser, RoleName.ADMIN);
-            // ADMIN sees vendor identity after round closes; EXECUTIVE always sees only rates
-            boolean hideIdentity = !isAdmin || trade.isBiddingOpen();
+            // ADMIN always sees vendor identity; EXECUTIVE always sees only rates
+            boolean hideIdentity = !isAdmin;
             List<TradeBidRankResponse> leaderboard = buildLeaderboard(trade, hideIdentity);
-            List<TradeBidEntryResponse> entries = trade.isBiddingOpen()
-                ? List.of()
-                    : tradeBidRepository.findByTrade_IdOrderByRoundNumberAscBidAmountAscUpdatedAtAsc(tradeId).stream()
-                    .map(isAdmin ? this::toBidEntry : this::toBidEntryAnonymous)
+            BigDecimal usdRate = trade.getMode() == TradeMode.SEA ? exchangeRateService.getUsdToInrRate() : null;
+            List<TradeBidEntryResponse> entries = tradeBidRepository
+                    .findByTrade_IdOrderByRoundNumberAscBidAmountAscUpdatedAtAsc(tradeId).stream()
+                    .map(bid -> isAdmin ? toBidEntry(bid, usdRate) : toBidEntryAnonymous(bid, usdRate))
                     .toList();
 
             return new TradeBidBoardResponse(
@@ -237,7 +238,8 @@ public class TradeService {
                 b.getThcInr(),
                 b.getCfsInr(),
                 b.getOtherChargesComments(),
-                b.getUpdatedAt()))
+                b.getUpdatedAt(),
+                null))
             .toList();
 
         return new TradeBidBoardResponse(
@@ -621,6 +623,19 @@ public class TradeService {
         List<TradeBid> roundBids = tradeBidRepository
             .findByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(trade.getId(), trade.getCurrentRound());
 
+        BigDecimal usdRate = trade.getMode() == TradeMode.SEA ? exchangeRateService.getUsdToInrRate() : null;
+
+        // For SEA trades rank by total INR estimate (ocean freight × USD rate + IHC + THC + CFS)
+        if (trade.getMode() == TradeMode.SEA && usdRate != null) {
+            final BigDecimal rate = usdRate;
+            roundBids = roundBids.stream()
+                .sorted(Comparator.comparing((TradeBid bid) -> {
+                    BigDecimal total = computeSeaTotal(bid, rate);
+                    return total != null ? total : BigDecimal.valueOf(Long.MAX_VALUE);
+                }))
+                .toList();
+        }
+
         List<TradeBidRankResponse> leaderboard = new ArrayList<>();
         List<String> ranks = List.of("L1", "L2", "L3");
         for (int i = 0; i < Math.min(3, roundBids.size()); i++) {
@@ -634,16 +649,27 @@ public class TradeService {
                     bid.getIhcInr(),
                     bid.getThcInr(),
                     bid.getCfsInr(),
-                    bid.getOtherChargesComments()));
+                    bid.getOtherChargesComments(),
+                    computeSeaTotal(bid, usdRate)));
         }
         return leaderboard;
+    }
+
+    /** Computes total INR estimate for SEA bids: (freightUSD × usdRate) + IHC + THC + CFS. Returns null if usdRate is null or bidAmount is null. */
+    private BigDecimal computeSeaTotal(TradeBid bid, BigDecimal usdRate) {
+        if (usdRate == null || bid.getBidAmount() == null) return null;
+        BigDecimal total = bid.getBidAmount().multiply(usdRate);
+        if (bid.getIhcInr() != null) total = total.add(bid.getIhcInr());
+        if (bid.getThcInr() != null) total = total.add(bid.getThcInr());
+        if (bid.getCfsInr() != null) total = total.add(bid.getCfsInr());
+        return total.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private boolean isFinalRound(Trade trade) {
         return trade.getCurrentRound() >= 2;
     }
 
-    private TradeBidEntryResponse toBidEntry(TradeBid bid) {
+    private TradeBidEntryResponse toBidEntry(TradeBid bid, BigDecimal usdRate) {
         return new TradeBidEntryResponse(
                 bid.getRoundNumber(),
                 bid.getVendor().getName(),
@@ -656,10 +682,11 @@ public class TradeService {
                 bid.getThcInr(),
                 bid.getCfsInr(),
                 bid.getOtherChargesComments(),
-                bid.getUpdatedAt());
+                bid.getUpdatedAt(),
+                computeSeaTotal(bid, usdRate));
     }
 
-    private TradeBidEntryResponse toBidEntryAnonymous(TradeBid bid) {
+    private TradeBidEntryResponse toBidEntryAnonymous(TradeBid bid, BigDecimal usdRate) {
         return new TradeBidEntryResponse(
                 bid.getRoundNumber(),
                 null,
@@ -672,7 +699,8 @@ public class TradeService {
                 bid.getThcInr(),
                 bid.getCfsInr(),
                 bid.getOtherChargesComments(),
-                bid.getUpdatedAt());
+                bid.getUpdatedAt(),
+                computeSeaTotal(bid, usdRate));
     }
 
     private String buildRoundSummaryHtml(UUID tradeId) {
@@ -735,7 +763,7 @@ public class TradeService {
                 trade.getFinalL1Rate(),
                 trade.getCreatedAt(),
                 trade.getAutoCloseAt(),
-                trade.getCreatedBy().getEmail());
+                trade.getCreatedBy() != null ? trade.getCreatedBy().getEmail() : null);
     }
 
     private String toDisplayMode(TradeMode mode) {

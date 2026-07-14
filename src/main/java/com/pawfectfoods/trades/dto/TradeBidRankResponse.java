@@ -12,6 +12,7 @@ public record TradeBidRankResponse(
         BigDecimal ihcInr,
         BigDecimal thcInr,
         BigDecimal cfsInr,
-        String otherChargesComments
+        String otherChargesComments,
+        BigDecimal totalInr
 ) {
 }

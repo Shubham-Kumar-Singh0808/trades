@@ -33,6 +33,8 @@ export default function VendorsPage({ session }) {
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [form, setForm] = useState({ name: '', companyName: '', mobileNo: '', email: '' });
+  const [deleteConfirmVendor, setDeleteConfirmVendor] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const roles = session?.roles || [];
   const isAdmin = roles.includes('ADMIN');
@@ -100,6 +102,51 @@ export default function VendorsPage({ session }) {
     setContactModalOpen(true);
   };
 
+  const handleActivateVendor = async (id) => {
+    setActionLoading(true);
+    setError('');
+    try {
+      await api.patch(`/api/vendors/${id}/activate`);
+      setSuccess('Vendor activated.');
+      load(page);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to activate vendor');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeactivateVendor = async (id) => {
+    setActionLoading(true);
+    setError('');
+    try {
+      await api.patch(`/api/vendors/${id}/deactivate`);
+      setSuccess('Vendor deactivated.');
+      load(page);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to deactivate vendor');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteVendor = async () => {
+    if (!deleteConfirmVendor) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      await api.delete(`/api/vendors/${deleteConfirmVendor.id}`);
+      setSuccess(`Vendor "${deleteConfirmVendor.name}" deleted.`);
+      setDeleteConfirmVendor(null);
+      load(1);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to delete vendor');
+      setDeleteConfirmVendor(null);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Typography variant="h5">All Vendors</Typography>
@@ -132,14 +179,24 @@ export default function VendorsPage({ session }) {
                       </Stack>
                     </Box>
                     <Box>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => openContactDetails(v)}
-                        sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
-                      >
-                        View
-                      </Button>
+                      <Stack spacing={0.5}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => openContactDetails(v)}
+                          sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
+                        >
+                          View
+                        </Button>
+                        {isAdmin && (
+                          v.active
+                            ? <Button size="small" variant="outlined" color="warning" disabled={actionLoading} onClick={() => handleDeactivateVendor(v.id)}>Deactivate</Button>
+                            : <Button size="small" variant="outlined" color="success" disabled={actionLoading} onClick={() => handleActivateVendor(v.id)}>Activate</Button>
+                        )}
+                        {isAdmin && (
+                          <Button size="small" variant="outlined" color="error" disabled={actionLoading} onClick={() => setDeleteConfirmVendor(v)}>Delete</Button>
+                        )}
+                      </Stack>
                     </Box>
                   </Stack>
                 </Card>
@@ -175,14 +232,24 @@ export default function VendorsPage({ session }) {
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => openContactDetails(v)}
-                        sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
-                      >
-                        View Details
-                      </Button>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => openContactDetails(v)}
+                          sx={{ borderColor: '#3a8a3a', color: '#3a8a3a', '&:hover': { borderColor: '#2d6b2d', color: '#2d6b2d' } }}
+                        >
+                          View Details
+                        </Button>
+                        {isAdmin && (
+                          v.active
+                            ? <Button size="small" variant="outlined" color="warning" disabled={actionLoading} onClick={() => handleDeactivateVendor(v.id)}>Deactivate</Button>
+                            : <Button size="small" variant="outlined" color="success" disabled={actionLoading} onClick={() => handleActivateVendor(v.id)}>Activate</Button>
+                        )}
+                        {isAdmin && (
+                          <Button size="small" variant="outlined" color="error" disabled={actionLoading} onClick={() => setDeleteConfirmVendor(v)}>Delete</Button>
+                        )}
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -278,6 +345,17 @@ export default function VendorsPage({ session }) {
           <Button onClick={() => setContactModalOpen(false)} sx={{ color: '#666' }}>Close</Button>
         </DialogActions>
       </Dialog>
+      <Dialog open={!!deleteConfirmVendor} onClose={() => setDeleteConfirmVendor(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Vendor</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to permanently delete <strong>{deleteConfirmVendor?.name}</strong>? This cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmVendor(null)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button onClick={handleDeleteVendor} variant="contained" color="error" disabled={actionLoading}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
     </Stack>
   );
 }

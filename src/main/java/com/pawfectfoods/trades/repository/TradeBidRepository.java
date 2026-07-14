@@ -15,6 +15,8 @@ public interface TradeBidRepository extends JpaRepository<TradeBid, UUID> {
 
     Optional<TradeBid> findByTrade_IdAndVendor_IdAndRoundNumber(UUID tradeId, UUID vendorId, int roundNumber);
 
+    void deleteByVendor_Id(UUID vendorId);
+
     List<TradeBid> findByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(UUID tradeId, int roundNumber);
 
     Optional<TradeBid> findFirstByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(UUID tradeId, int roundNumber);

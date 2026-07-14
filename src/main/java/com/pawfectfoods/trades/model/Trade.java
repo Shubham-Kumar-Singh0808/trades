@@ -62,8 +62,8 @@ public class Trade {
     @Column(nullable = true)
     private Instant autoCloseAt;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "created_by", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "created_by", nullable = true)
     private AppUser createdBy;
 
     @Builder.Default

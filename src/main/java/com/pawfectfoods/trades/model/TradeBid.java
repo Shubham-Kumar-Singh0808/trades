@@ -61,13 +61,13 @@ public class TradeBid {
     private BigDecimal bidAmount;
 
     // Air-mode fields
-    @Column(length = 500)
+    @Column(columnDefinition = "text")
     private String airlines;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "text")
     private String routing;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "text")
     private String comments;
 
     // Sea-mode fields
@@ -80,7 +80,7 @@ public class TradeBid {
     @Column(precision = 12, scale = 4)
     private BigDecimal cfsInr;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "text")
     private String otherChargesComments;
 
     @Column(nullable = false)

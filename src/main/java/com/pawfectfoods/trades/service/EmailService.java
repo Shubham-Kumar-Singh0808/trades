@@ -1,6 +1,7 @@
 package com.pawfectfoods.trades.service;
 
 import java.util.List;
+import java.util.Set;
 import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,17 @@ public class EmailService {
 
     @Value("${app.frontend.base-url:http://localhost:4000}")
     private String frontendBaseUrl;
+
+    // Emails excluded from all trade/RFQ notifications (from address is also always excluded)
+    private static final Set<String> RESTRICTED_TRADE_EMAILS = Set.of(
+            "admin@pawfectfoods.co.in"
+    );
+
+    private boolean isAllowedTradeRecipient(String email) {
+        if (email == null) return false;
+        String lower = email.trim().toLowerCase();
+        return !RESTRICTED_TRADE_EMAILS.contains(lower) && !lower.equals(fromAddress.trim().toLowerCase());
+    }
 
     public void sendVerificationEmail(String toEmail, String token) {
         String verificationUrl = verificationBaseUrl + token;
@@ -202,6 +214,7 @@ public class EmailService {
         String subject = "PAWFECT RFQ ACTIVITY ID " + tradeId;
 
         for (String recipient : recipients) {
+            if (!isAllowedTradeRecipient(recipient)) continue;
             try {
                 String htmlBody = buildRfqPostingHtml(tradeId, description, mode, detailsUrl);
                 sendHtmlEmail(recipient, subject, htmlBody);
@@ -253,6 +266,7 @@ public class EmailService {
         String l1Text = l1Rate == null ? "N/A" : l1Rate.toPlainString();
 
         for (String recipient : recipients) {
+            if (!isAllowedTradeRecipient(recipient)) continue;
             String htmlBody = """
                     <html>
                         <body style="margin:0;padding:0;background:#f6fbf8;font-family:'Segoe UI',Arial,sans-serif;">
@@ -283,6 +297,10 @@ public class EmailService {
             String tradeId,
             String description,
             BigDecimal winningBidAmount) {
+        if (!isAllowedTradeRecipient(toEmail)) {
+            log.debug("Skipping winner notification to restricted address: {}", toEmail);
+            return;
+        }
         String safeName = vendorName == null || vendorName.isBlank() ? "Vendor" : vendorName;
         String detailsUrl = frontendBaseUrl + "/trades";
         String htmlBody = """
@@ -324,6 +342,7 @@ public class EmailService {
 
         String previousRoundL1Text = previousRoundL1Bid == null ? "N/A" : previousRoundL1Bid.toString();
         for (String recipient : recipients) {
+            if (!isAllowedTradeRecipient(recipient)) continue;
             String htmlBody = """
                     <html>
                         <body style=\"margin:0;padding:0;background:#f6f8ff;font-family:'Segoe UI',Arial,sans-serif;\">
@@ -377,6 +396,7 @@ public class EmailService {
                 """.formatted(tradeId, safeDescription, roundsSummaryHtml);
 
         for (String recipient : recipients) {
+            if (!isAllowedTradeRecipient(recipient)) continue;
             sendHtmlEmail(recipient, "PAWFECT RFQ ACTIVITY ID " + tradeId, htmlBody);
         }
     }

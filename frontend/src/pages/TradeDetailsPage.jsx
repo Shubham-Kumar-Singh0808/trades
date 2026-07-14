@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api/client';
 
@@ -41,6 +41,32 @@ const formatRate = (value, isUsd = false) => {
   }
   return isUsd ? `$${value}` : `Rs. ${value}`;
 };
+
+// Displays long text (comments/routing) as 1 truncated line with a "More" button
+function LongTextCell({ text }) {
+  const [open, setOpen] = React.useState(false);
+  if (!text) return <span>—</span>;
+  const firstLine = text.split('\n')[0];
+  const isTruncated = text.length > firstLine.length || firstLine.length > 80;
+  const displayText = firstLine.length > 80 ? firstLine.slice(0, 80) + '…' : firstLine;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>{displayText}</Typography>
+      {isTruncated && (
+        <>
+          <Button size="small" sx={{ minWidth: 0, p: '0 4px', fontSize: '0.7rem', color: '#1565c0' }} onClick={() => setOpen(true)}>More</Button>
+          <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Full Comment</DialogTitle>
+            <DialogContent dividers>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{text}</Typography>
+            </DialogContent>
+            <DialogActions><Button onClick={() => setOpen(false)}>Close</Button></DialogActions>
+          </Dialog>
+        </>
+      )}
+    </Box>
+  );
+}
 
 export default function TradeDetailsPage({ session }) {
   const { id } = useParams();
@@ -350,10 +376,11 @@ export default function TradeDetailsPage({ session }) {
                           <CardContent>
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                               <Typography variant="subtitle2">Rank {item.rank}</Typography>
-                              <Typography variant="body2">{formatRate(item.bidAmount)}</Typography>
+                              <Typography variant="body2">{formatRate(item.bidAmount, trade?.mode === 'SEA')}</Typography>
                             </Stack>
                             <Typography variant="body2" color="text.secondary">{item.vendorName || 'Hidden during bidding'}</Typography>
                             <Typography variant="body2" color="text.secondary">{item.companyName || 'Hidden during bidding'}</Typography>
+                            {trade?.mode === 'SEA' && item.totalInr != null && <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>Total est.: ₹{Number(item.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Typography>}
                           </CardContent>
                         </Card>
                       ))}
@@ -369,6 +396,7 @@ export default function TradeDetailsPage({ session }) {
                             <TableCell>THC (INR)</TableCell>
                             <TableCell>CFS (INR)</TableCell>
                             <TableCell>Other Charges</TableCell>
+                            <TableCell>Total Est. (INR)</TableCell>
                           </>}
                           <TableCell>Vendor</TableCell>
                           <TableCell>Company</TableCell>
@@ -383,7 +411,8 @@ export default function TradeDetailsPage({ session }) {
                               <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
                               <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
                               <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
-                              <TableCell>{item.otherChargesComments || '—'}</TableCell>
+                              <TableCell><LongTextCell text={item.otherChargesComments} /></TableCell>
+                              <TableCell sx={{ fontWeight: 600, color: '#1565c0' }}>{item.totalInr != null ? `₹${Number(item.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}</TableCell>
                             </>}
                             <TableCell>{item.vendorName || 'Hidden during bidding'}</TableCell>
                             <TableCell>{item.companyName || 'Hidden during bidding'}</TableCell>
@@ -412,13 +441,14 @@ export default function TradeDetailsPage({ session }) {
                               </Stack>
                               {!isVendor && entry.vendorName && <Typography variant="body2" color="text.secondary">{entry.vendorName}</Typography>}
                               {!isVendor && entry.companyName && <Typography variant="body2" color="text.secondary">{entry.companyName}</Typography>}
-                              {entry.airlines && <Typography variant="body2" color="text.secondary">Airlines: {entry.airlines}</Typography>}
-                              {entry.routing && <Typography variant="body2" color="text.secondary">Routing: {entry.routing}</Typography>}
-                              {entry.comments && <Typography variant="body2" color="text.secondary">Comments: {entry.comments}</Typography>}
+                              {entry.airlines && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>Airlines: {entry.airlines}</Typography>}
+                              {entry.routing && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>Routing: {entry.routing}</Typography>}
+                              {entry.comments && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>Comments: {entry.comments}</Typography>}
                               {entry.ihcInr != null && <Typography variant="body2" color="text.secondary">IHC: ₹{entry.ihcInr}/ctr</Typography>}
                               {entry.thcInr != null && <Typography variant="body2" color="text.secondary">THC: ₹{entry.thcInr}/ctr</Typography>}
                               {entry.cfsInr != null && <Typography variant="body2" color="text.secondary">CFS: ₹{entry.cfsInr}/ctr</Typography>}
-                              {entry.otherChargesComments && <Typography variant="body2" color="text.secondary">Other: {entry.otherChargesComments}</Typography>}
+                              {entry.otherChargesComments && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>Other: {entry.otherChargesComments}</Typography>}
+                              {entry.totalInr != null && <Typography variant="body2" sx={{ fontWeight: 600, color: '#1565c0' }}>Total est.: ₹{Number(entry.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Typography>}
                               <Typography variant="caption" color="text.secondary">{entry.submittedAt}</Typography>
                             </Stack>
                           </CardContent>
@@ -445,6 +475,7 @@ export default function TradeDetailsPage({ session }) {
                               <TableCell>THC (INR)</TableCell>
                               <TableCell>CFS (INR)</TableCell>
                               <TableCell>Other</TableCell>
+                              <TableCell>Total Est. (INR)</TableCell>
                             </>
                           )}
                           <TableCell>Submitted At</TableCell>
@@ -459,16 +490,17 @@ export default function TradeDetailsPage({ session }) {
                             <TableCell>{formatRate(entry.bidAmount, trade?.mode === 'SEA')}</TableCell>
                             {trade?.mode === 'AIR' ? (
                               <>
-                                <TableCell>{entry.airlines || '—'}</TableCell>
-                                <TableCell>{entry.routing || '—'}</TableCell>
-                                <TableCell>{entry.comments || '—'}</TableCell>
+                                <TableCell><LongTextCell text={entry.airlines} /></TableCell>
+                                <TableCell><LongTextCell text={entry.routing} /></TableCell>
+                                <TableCell><LongTextCell text={entry.comments} /></TableCell>
                               </>
                             ) : (
                               <>
                                 <TableCell>{entry.ihcInr != null ? `₹${entry.ihcInr}` : '—'}</TableCell>
                                 <TableCell>{entry.thcInr != null ? `₹${entry.thcInr}` : '—'}</TableCell>
                                 <TableCell>{entry.cfsInr != null ? `₹${entry.cfsInr}` : '—'}</TableCell>
-                                <TableCell>{entry.otherChargesComments || '—'}</TableCell>
+                                <TableCell><LongTextCell text={entry.otherChargesComments} /></TableCell>
+                                <TableCell sx={{ fontWeight: 600, color: '#1565c0' }}>{entry.totalInr != null ? `₹${Number(entry.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}</TableCell>
                               </>
                             )}
                             <TableCell>{entry.submittedAt}</TableCell>
@@ -686,7 +718,7 @@ export default function TradeDetailsPage({ session }) {
                       <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
                       <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
                       <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
-                      <TableCell>{item.otherChargesComments || '—'}</TableCell>
+                      <TableCell><LongTextCell text={item.otherChargesComments} /></TableCell>
                     </>}
                     <TableCell>{item.vendorName || '—'}</TableCell>
                     <TableCell>{item.companyName || '—'}</TableCell>

@@ -15,6 +15,7 @@ public record TradeBidEntryResponse(
         BigDecimal thcInr,
         BigDecimal cfsInr,
         String otherChargesComments,
-        Instant submittedAt
+        Instant submittedAt,
+        BigDecimal totalInr
 ) {
 }

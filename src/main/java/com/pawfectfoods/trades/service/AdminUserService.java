@@ -12,6 +12,8 @@ import com.pawfectfoods.trades.model.Vendor;
 import com.pawfectfoods.trades.repository.AppUserRepository;
 import com.pawfectfoods.trades.repository.EmailVerificationTokenRepository;
 import com.pawfectfoods.trades.repository.RoleRepository;
+import com.pawfectfoods.trades.repository.TradeBidRepository;
+import com.pawfectfoods.trades.repository.TradeRepository;
 import com.pawfectfoods.trades.repository.VendorRepository;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -39,6 +41,8 @@ public class AdminUserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationTokenRepository tokenRepository;
     private final VendorRepository vendorRepository;
+    private final TradeBidRepository tradeBidRepository;
+    private final TradeRepository tradeRepository;
     private final EmailService emailService;
 
     @Transactional
@@ -119,16 +123,24 @@ public class AdminUserService {
 
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Pageable pageable) {
-        return appUserRepository.findAll(pageable).map(this::toResponse);
+        return appUserRepository.findByEmailNot("admin@pawfectfoods.com", pageable).map(this::toResponse);
     }
 
     @Transactional
     public void deleteUser(UUID userId) {
         AppUser user = findUserById(userId);
+        // Nullify trades created by this user so the FK constraint doesn't block deletion
+        tradeRepository.findByCreatedBy(user).forEach(trade -> {
+            trade.setCreatedBy(null);
+            tradeRepository.save(trade);
+        });
+        // Delete bids submitted by this vendor (if any)
+        vendorRepository.findByEmail(user.getEmail()).ifPresent(vendor -> {
+            tradeBidRepository.deleteByVendor_Id(vendor.getId());
+            vendorRepository.delete(vendor);
+        });
         // Delete associated email verification tokens
         tokenRepository.deleteByUser(user);
-        // Delete associated vendor if exists
-        vendorRepository.findByEmail(user.getEmail()).ifPresent(vendorRepository::delete);
         // Delete the user
         appUserRepository.delete(user);
     }

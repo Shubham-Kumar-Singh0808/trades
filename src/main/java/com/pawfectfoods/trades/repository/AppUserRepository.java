@@ -5,6 +5,8 @@ import com.pawfectfoods.trades.model.RoleName;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
@@ -17,4 +19,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     boolean existsByEmailIgnoreCase(String email);
 
     List<AppUser> findDistinctByRoles_Name(RoleName roleName);
+
+    Page<AppUser> findByEmailNot(String email, Pageable pageable);
 }

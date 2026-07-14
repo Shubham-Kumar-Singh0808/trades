@@ -1,5 +1,33 @@
 # Changes Log
 
+## 2026-05-15 - Feature Batch: Comment Formatting, Email Restrictions, Vendor Management, SEA Total
+
+### Feature 1: Comment Formatting (frontend)
+- Added `LongTextCell` component in `TradeDetailsPage.jsx` — truncates text to first line (80 chars) with a "More" button that opens a popup Dialog with `whiteSpace: 'pre-wrap'`.
+- Applied to: `comments`, `routing`, `airlines`, `otherChargesComments` in both bid entries table and leaderboard.
+- Mobile cards: text fields now use `whiteSpace: 'pre-wrap'` for full multi-line display.
+
+### Feature 2: Email Restrictions
+- Added `RESTRICTED_TRADE_EMAILS` constant in `EmailService.java` containing `admin@pawfectfoods.co.in`.
+- Added `isAllowedTradeRecipient(String email)` helper that also excludes the FROM address (`rfq@pawfectfoods.co.in`) dynamically.
+- Applied filter to all trade notification methods: `sendTradeCreatedNotification`, `sendTradeRoundClosedNotification`, `sendTradeBidReopenedNotification`, `sendTradeBidFinalSummaryToAdmins`, `sendTradeBidWinnerNotification`.
+
+### Feature 3: Vendor Activate/Deactivate/Delete (frontend)
+- Added `handleActivateVendor`, `handleDeactivateVendor`, `handleDeleteVendor` in `VendorsPage.jsx`.
+- ADMIN-only Activate/Deactivate toggle button and Delete button added to both desktop table and mobile cards.
+- Delete triggers a confirmation dialog before calling `DELETE /api/vendors/{id}`.
+- Backend endpoints already existed: `PATCH /{id}/activate`, `PATCH /{id}/deactivate`, `DELETE /{id}`.
+
+### Feature 4: SEA Freight USD→INR Total
+- Created `ExchangeRateService.java`: fetches USD/INR rate from `https://open.er-api.com/v6/latest/USD` (free API, no key needed), caches for 1 hour.
+- Added `totalInr` (BigDecimal) field to `TradeBidRankResponse` and `TradeBidEntryResponse`.
+- `TradeService`: injected `ExchangeRateService`, added `computeSeaTotal(bid, usdRate)` helper, passes `usdRate` to `buildLeaderboard`, `toBidEntry`, `toBidEntryAnonymous`.
+- Frontend: "Total Est. (INR)" column added to SEA leaderboard and bid entries tables; mobile cards show inline.
+
+### Validation
+- Backend compile: `mvn compile -q` → no errors
+- Frontend build: `npx vite build` → ✓ built successfully
+
 ## 2026-05-14 - Docker + Nginx Deployment Packaging
 
 ### DevOps Updates

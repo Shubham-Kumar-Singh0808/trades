@@ -1,5 +1,6 @@
 package com.pawfectfoods.trades.repository;
 
+import com.pawfectfoods.trades.model.AppUser;
 import com.pawfectfoods.trades.model.Trade;
 import com.pawfectfoods.trades.model.TradeMode;
 import java.time.Instant;
@@ -12,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface TradeRepository extends JpaRepository<Trade, UUID> {
     boolean existsByTradeId(String tradeId);
+
+    java.util.List<Trade> findByCreatedBy(AppUser createdBy);
 
     java.util.List<Trade> findByBiddingOpenTrueAndClosedAtIsNullAndAutoCloseAtLessThanEqual(Instant autoCloseAt);
 

@@ -55,6 +55,20 @@ public class DataInitializer implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("Could not drop trade_mode_check constraint: {}", e.getMessage());
         }
+        // Widen text columns from varchar to TEXT so long inputs are not rejected
+        for (String sql : new String[]{
+                "ALTER TABLE trade_bid ALTER COLUMN airlines TYPE TEXT",
+                "ALTER TABLE trade_bid ALTER COLUMN routing TYPE TEXT",
+                "ALTER TABLE trade_bid ALTER COLUMN comments TYPE TEXT",
+                "ALTER TABLE trade_bid ALTER COLUMN other_charges_comments TYPE TEXT",
+                "ALTER TABLE trade ALTER COLUMN created_by DROP NOT NULL"
+        }) {
+            try {
+                jdbcTemplate.execute(sql);
+            } catch (Exception e) {
+                log.warn("Column migration skipped ({}): {}", sql, e.getMessage());
+            }
+        }
     }
 
     private void initializeRoles() {
