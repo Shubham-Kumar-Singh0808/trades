@@ -39,11 +39,10 @@ export default function UsersPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const { showConfirm } = useDeleteConfirm();
   const [form, setForm] = useState({
-    role: 'VENDOR',
+    role: 'EXECUTIVE',
     name: '',
     email: '',
     mobileNo: '',
-    companyName: '',
     enabled: true,
   });
   const [editingUser, setEditingUser] = useState(null);
@@ -53,7 +52,7 @@ export default function UsersPage() {
     setSuccess('');
     try {
       const res = await api.get('/api/admin/users', {
-        params: { page: targetPage - 1, size: 10, sort: 'email,asc' },
+        params: { page: targetPage - 1, size: 10, sort: 'email,asc', excludeRole: 'VENDOR' },
       });
       setData(res.data);
     } catch (err) {
@@ -71,7 +70,7 @@ export default function UsersPage() {
     setSuccess('');
     try {
       await api.post('/api/admin/users', form);
-      setForm({ role: 'VENDOR', name: '', email: '', mobileNo: '', companyName: '', enabled: true });
+      setForm({ role: 'EXECUTIVE', name: '', email: '', mobileNo: '', enabled: true });
       setSuccess('User created. Setup password email sent.');
       load(1);
     } catch (err) {
@@ -261,33 +260,20 @@ export default function UsersPage() {
         <DialogContent>
           {editingUser && (
             <Stack spacing={2} sx={{ mt: 1 }}>
-              {editingUser.originalRole === 'VENDOR' && (
-                <Alert severity="info">Vendor role cannot be changed.</Alert>
-              )}
               <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={editingUser.role}
                   label="Role"
-                  disabled={editingUser.originalRole === 'VENDOR'}
-                  onChange={(e) => setEditingUser((p) => ({ ...p, role: e.target.value, companyName: e.target.value === 'VENDOR' ? p.companyName : '' }))}
+                  onChange={(e) => setEditingUser((p) => ({ ...p, role: e.target.value }))}
                 >
-                  {editingUser.originalRole === 'VENDOR' ? (
-                    <MenuItem value="VENDOR">VENDOR</MenuItem>
-                  ) : (
-                    [
-                      <MenuItem key="EXECUTIVE" value="EXECUTIVE">EXECUTIVE</MenuItem>,
-                      <MenuItem key="ADMIN" value="ADMIN">ADMIN</MenuItem>,
-                    ]
-                  )}
+                  <MenuItem value="EXECUTIVE">EXECUTIVE</MenuItem>
+                  <MenuItem value="ADMIN">ADMIN</MenuItem>
                 </Select>
               </FormControl>
               <TextField label="Name" value={editingUser.name || ''} onChange={(e) => setEditingUser((p) => ({ ...p, name: e.target.value }))} fullWidth />
               <TextField label="Email" value={editingUser.email || ''} onChange={(e) => setEditingUser((p) => ({ ...p, email: e.target.value }))} fullWidth />
               <TextField label="Phone" value={editingUser.mobileNo || ''} onChange={(e) => setEditingUser((p) => ({ ...p, mobileNo: e.target.value }))} fullWidth />
-              {editingUser.role === 'VENDOR' && (
-                <TextField label="Company Name" value={editingUser.companyName || ''} onChange={(e) => setEditingUser((p) => ({ ...p, companyName: e.target.value }))} fullWidth />
-              )}
             </Stack>
           )}
         </DialogContent>
@@ -306,9 +292,8 @@ export default function UsersPage() {
               <Select
                 value={form.role}
                 label="Role"
-                onChange={(e) => setForm((p) => ({ ...p, role: e.target.value, companyName: e.target.value === 'VENDOR' ? p.companyName : '' }))}
+                onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
               >
-                <MenuItem value="VENDOR">VENDOR</MenuItem>
                 <MenuItem value="EXECUTIVE">EXECUTIVE</MenuItem>
                 <MenuItem value="ADMIN">ADMIN</MenuItem>
               </Select>
@@ -316,9 +301,6 @@ export default function UsersPage() {
             <TextField label="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} fullWidth />
             <TextField label="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} fullWidth />
             <TextField label="Phone" value={form.mobileNo} onChange={(e) => setForm((p) => ({ ...p, mobileNo: e.target.value }))} fullWidth />
-            {form.role === 'VENDOR' && (
-              <TextField label="Company Name" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} fullWidth />
-            )}
           </Stack>
         </DialogContent>
         <DialogActions>

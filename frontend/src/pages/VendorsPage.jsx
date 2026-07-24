@@ -8,6 +8,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Pagination,
   Stack,
   Table,
@@ -16,8 +17,10 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { Edit as EditIcon } from '@mui/icons-material';
 import Box from '@mui/material/Box';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
@@ -34,6 +37,7 @@ export default function VendorsPage({ session }) {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [form, setForm] = useState({ name: '', companyName: '', mobileNo: '', email: '' });
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState(null);
+  const [editingVendor, setEditingVendor] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const roles = session?.roles || [];
@@ -147,6 +151,28 @@ export default function VendorsPage({ session }) {
     }
   };
 
+  const saveVendorEdit = async () => {
+    if (!editingVendor) return;
+    setActionLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await api.put(`/api/vendors/${editingVendor.id}`, {
+        name: editingVendor.name,
+        companyName: editingVendor.companyName,
+        mobileNo: editingVendor.mobileNo,
+        email: editingVendor.email,
+      });
+      setSuccess('Vendor updated successfully.');
+      setEditingVendor(null);
+      load(page);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to update vendor');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Typography variant="h5">All Vendors</Typography>
@@ -188,6 +214,9 @@ export default function VendorsPage({ session }) {
                         >
                           View
                         </Button>
+                        {isAdmin && (
+                          <Button size="small" variant="outlined" startIcon={<EditIcon />} disabled={actionLoading} onClick={() => setEditingVendor({ ...v })}>Edit</Button>
+                        )}
                         {isAdmin && (
                           v.active
                             ? <Button size="small" variant="outlined" color="warning" disabled={actionLoading} onClick={() => handleDeactivateVendor(v.id)}>Deactivate</Button>
@@ -241,6 +270,11 @@ export default function VendorsPage({ session }) {
                         >
                           View Details
                         </Button>
+                        {isAdmin && (
+                          <Tooltip title="Edit">
+                            <IconButton size="small" color="primary" disabled={actionLoading} onClick={() => setEditingVendor({ ...v })}><EditIcon fontSize="small" /></IconButton>
+                          </Tooltip>
+                        )}
                         {isAdmin && (
                           v.active
                             ? <Button size="small" variant="outlined" color="warning" disabled={actionLoading} onClick={() => handleDeactivateVendor(v.id)}>Deactivate</Button>
@@ -353,6 +387,24 @@ export default function VendorsPage({ session }) {
         <DialogActions>
           <Button onClick={() => setDeleteConfirmVendor(null)} sx={{ color: '#666' }}>Cancel</Button>
           <Button onClick={handleDeleteVendor} variant="contained" color="error" disabled={actionLoading}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!editingVendor} onClose={() => setEditingVendor(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Vendor — {editingVendor?.name}</DialogTitle>
+        <DialogContent>
+          {editingVendor && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField label="Name" value={editingVendor.name || ''} onChange={(e) => setEditingVendor((p) => ({ ...p, name: e.target.value }))} fullWidth />
+              <TextField label="Company Name" value={editingVendor.companyName || ''} onChange={(e) => setEditingVendor((p) => ({ ...p, companyName: e.target.value }))} fullWidth />
+              <TextField label="Email" value={editingVendor.email || ''} onChange={(e) => setEditingVendor((p) => ({ ...p, email: e.target.value }))} fullWidth />
+              <TextField label="Mobile" value={editingVendor.mobileNo || ''} onChange={(e) => setEditingVendor((p) => ({ ...p, mobileNo: e.target.value }))} fullWidth />
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingVendor(null)} sx={{ color: '#666' }}>Cancel</Button>
+          <Button onClick={saveVendorEdit} variant="contained" disabled={actionLoading} sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>Save</Button>
         </DialogActions>
       </Dialog>
 

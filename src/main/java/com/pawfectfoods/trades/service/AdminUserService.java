@@ -122,7 +122,10 @@ public class AdminUserService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(Pageable pageable) {
+    public Page<UserResponse> getAllUsers(Pageable pageable, RoleName excludeRole) {
+        if (excludeRole != null) {
+            return appUserRepository.findByEmailNotAndWithoutRole("admin@pawfectfoods.com", excludeRole, pageable).map(this::toResponse);
+        }
         return appUserRepository.findByEmailNot("admin@pawfectfoods.com", pageable).map(this::toResponse);
     }
 

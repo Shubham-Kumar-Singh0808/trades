@@ -1,4 +1,4 @@
-import { Alert, Button, Card, CardContent, Chip, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
@@ -9,6 +9,7 @@ export default function PendingRegistrationsPage({ session }) {
   const [registrationRequests, setRegistrationRequests] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedVendor, setSelectedVendor] = useState(null);
 
   const roles = session?.roles || [];
   const canReviewRequests = roles.includes('ADMIN') || roles.includes('EXECUTIVE');
@@ -100,6 +101,7 @@ export default function PendingRegistrationsPage({ session }) {
                         <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{row.email}</Typography>
                         <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{row.officeAddress}</Typography>
                         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                          <Button size="small" variant="outlined" onClick={() => setSelectedVendor(row)}>View</Button>
                           <Button size="small" variant="contained" onClick={() => approveRegistration(row.id)} sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}>{approveLabelFor(row)}</Button>
                           <Button size="small" variant="outlined" disabled={!roles.includes('ADMIN')} onClick={() => rejectRegistration(row.id)} color="error">Reject</Button>
                         </Stack>
@@ -140,6 +142,7 @@ export default function PendingRegistrationsPage({ session }) {
                       <TableCell sx={{ maxWidth: 300, wordBreak: 'break-word' }}>{row.officeAddress}</TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={1}>
+                          <Button size="small" variant="outlined" onClick={() => setSelectedVendor(row)}>View</Button>
                           <Button size="small" variant="contained" onClick={() => approveRegistration(row.id)} sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}>{approveLabelFor(row)}</Button>
                           <Button size="small" variant="outlined" disabled={!roles.includes('ADMIN')} onClick={() => rejectRegistration(row.id)} color="error">Reject</Button>
                         </Stack>
@@ -157,6 +160,60 @@ export default function PendingRegistrationsPage({ session }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Vendor Full Details Dialog */}
+      <Dialog open={!!selectedVendor} onClose={() => setSelectedVendor(null)} fullWidth maxWidth="sm" scroll="paper">
+        <DialogTitle>Vendor Details — {selectedVendor?.companyName}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="overline" color="text.secondary">Company Info</Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={0.5}>
+                <Typography variant="body2"><strong>Name:</strong> {selectedVendor?.name}</Typography>
+                <Typography variant="body2"><strong>Company:</strong> {selectedVendor?.companyName}</Typography>
+                <Typography variant="body2"><strong>GST No:</strong> {selectedVendor?.gstNo || '—'}</Typography>
+                <Typography variant="body2"><strong>GST Status:</strong> {selectedVendor?.gstStatus || '—'} {selectedVendor?.gstActive != null && <Chip size="small" label={selectedVendor.gstActive ? 'Active' : 'Not Active'} color={selectedVendor.gstActive ? 'success' : 'default'} sx={{ ml: 0.5 }} />}</Typography>
+                <Typography variant="body2"><strong>Registered Address:</strong> {selectedVendor?.registeredAddress || '—'}</Typography>
+                <Typography variant="body2"><strong>Office Address:</strong> {selectedVendor?.officeAddress || '—'}</Typography>
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="overline" color="text.secondary">Primary Contact</Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Stack spacing={0.5}>
+                <Typography variant="body2"><strong>Email:</strong> {selectedVendor?.email || '—'}</Typography>
+                <Typography variant="body2"><strong>Mobile:</strong> {selectedVendor?.mobileNo || '—'}</Typography>
+              </Stack>
+            </Box>
+            {selectedVendor?.contactPersons?.length > 0 && (
+              <Box>
+                <Typography variant="overline" color="text.secondary">Contact Persons</Typography>
+                <Divider sx={{ mb: 1 }} />
+                <Stack spacing={1.5}>
+                  {selectedVendor.contactPersons.map((cp, idx) => (
+                    <Box key={cp.id || idx} sx={{ pl: 1, borderLeft: '3px solid #e0e0e0' }}>
+                      <Typography variant="body2" fontWeight={600}>{cp.name || '—'}</Typography>
+                      <Typography variant="body2" color="text.secondary">{cp.designation || '—'}</Typography>
+                      <Typography variant="body2"><strong>Email:</strong> {cp.email || '—'}</Typography>
+                      <Typography variant="body2"><strong>Phone:</strong> {cp.phone || '—'}</Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { approveRegistration(selectedVendor.id); setSelectedVendor(null); }} variant="contained" sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}>
+            {approveLabelFor(selectedVendor)}
+          </Button>
+          <Button onClick={() => { rejectRegistration(selectedVendor.id); setSelectedVendor(null); }} variant="outlined" color="error" disabled={!roles.includes('ADMIN')}>
+            Reject
+          </Button>
+          <Button onClick={() => setSelectedVendor(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

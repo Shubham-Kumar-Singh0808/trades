@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Set;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -165,7 +168,8 @@ public class EmailService {
     ) {
         String safeName = name == null || name.isBlank() ? "User" : name;
         String safeRole = roleName == null || roleName.isBlank() ? "USER" : roleName;
-        String expiry = expiresAt == null ? "2 hours" : expiresAt.toString() + " UTC";
+        DateTimeFormatter ddMmYyyy = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String expiry = expiresAt == null ? "2 hours" : ZonedDateTime.ofInstant(expiresAt, ZoneId.of("Asia/Kolkata")).format(ddMmYyyy);
         String htmlBody = """
                 <html>
                     <body style=\"margin:0;padding:0;background:#eef6ff;font-family:'Segoe UI',Arial,sans-serif;\">

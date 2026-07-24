@@ -42,6 +42,11 @@ const formatRate = (value, isUsd = false) => {
   return isUsd ? `$${value}` : `Rs. ${value}`;
 };
 
+const formatDate = (iso) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB');
+};
+
 // Displays long text (comments/routing) as 1 truncated line with a "More" button
 function LongTextCell({ text }) {
   const [open, setOpen] = React.useState(false);
@@ -145,8 +150,8 @@ export default function TradeDetailsPage({ session }) {
   }, [id]);
 
   const submitBid = async () => {
-    if (!bidForm.bidAmount) {
-      setError('Please enter a bid amount.');
+    if (!bidForm.bidAmount || parseFloat(bidForm.bidAmount) <= 0) {
+      setError('Please enter a bid amount greater than 0.');
       return;
     }
     if (!termsAccepted) {
@@ -280,11 +285,15 @@ export default function TradeDetailsPage({ session }) {
               <Typography><strong>Mode:</strong> {getModeLabel(trade.mode)}</Typography>
               <Typography><strong>Description:</strong> {trade.description}</Typography>
               <Typography><strong>Created By:</strong> {trade.createdBy}</Typography>
-              <Typography><strong>Created At:</strong> {trade.createdAt}</Typography>
+              <Typography><strong>Created At:</strong> {formatDate(trade.createdAt)}</Typography>
               <Typography><strong>Bidding Status:</strong> {trade.cancelled ? 'CANCELLED' : trade.biddingOpen ? 'OPEN' : 'CLOSED'}</Typography>
               <Typography><strong>Current Round:</strong> {trade.currentRound}</Typography>
               <Typography><strong>Round Limit:</strong> R1 and R2 only</Typography>
-              <Typography><strong>Final L1 Rate:</strong> {formatRate(trade.finalL1Rate)}</Typography>
+              <Typography><strong>Final L1 Rate:</strong> {
+                trade.mode === 'SEA' && bidBoard?.leaderboard?.[0]?.totalInr != null
+                  ? `₹${Number(bidBoard.leaderboard[0].totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+                  : formatRate(trade.finalL1Rate, trade.mode === 'SEA')
+              }</Typography>
             </Stack>
           </CardContent>
         </Card>
@@ -350,8 +359,12 @@ export default function TradeDetailsPage({ session }) {
 
               {isVendor && (
                 <Stack spacing={2}>
-                  <Typography><strong>Your Current Round Bid:</strong> {formatRate(bidBoard.myCurrentBid)}</Typography>
-                  <Typography><strong>Final L1 Rate:</strong> {formatRate(bidBoard.finalL1Rate)}</Typography>
+                  <Typography><strong>Your Current Round Bid:</strong> {formatRate(bidBoard.myCurrentBid, trade?.mode === 'SEA')}</Typography>
+                  <Typography><strong>Final L1 Rate:</strong> {
+                    trade?.mode === 'SEA' && bidBoard?.leaderboard?.[0]?.totalInr != null
+                      ? `₹${Number(bidBoard.leaderboard[0].totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+                      : formatRate(bidBoard.finalL1Rate, trade?.mode === 'SEA')
+                  }</Typography>
                   {bidBoard.biddingOpen && !trade?.cancelled && (
                     <Box>
                       <Button
@@ -449,7 +462,7 @@ export default function TradeDetailsPage({ session }) {
                               {entry.cfsInr != null && <Typography variant="body2" color="text.secondary">CFS: ₹{entry.cfsInr}/ctr</Typography>}
                               {entry.otherChargesComments && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>Other: {entry.otherChargesComments}</Typography>}
                               {entry.totalInr != null && <Typography variant="body2" sx={{ fontWeight: 600, color: '#1565c0' }}>Total est.: ₹{Number(entry.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Typography>}
-                              <Typography variant="caption" color="text.secondary">{entry.submittedAt}</Typography>
+                              <Typography variant="caption" color="text.secondary">{formatDate(entry.submittedAt)}</Typography>
                             </Stack>
                           </CardContent>
                         </Card>
@@ -503,7 +516,7 @@ export default function TradeDetailsPage({ session }) {
                                 <TableCell sx={{ fontWeight: 600, color: '#1565c0' }}>{entry.totalInr != null ? `₹${Number(entry.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}</TableCell>
                               </>
                             )}
-                            <TableCell>{entry.submittedAt}</TableCell>
+                            <TableCell>{formatDate(entry.submittedAt)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

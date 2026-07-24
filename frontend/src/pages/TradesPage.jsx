@@ -212,7 +212,7 @@ export default function TradesPage({ session }) {
                       </Stack>
                       <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{t.description}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Round {t.currentRound} {t.tradeClosed ? '• Finalized' : t.biddingOpen ? '• Open' : '• Closed'}
+                        Round {t.currentRound} {t.cancelled ? '• Cancelled' : t.tradeClosed ? '• Finalized' : t.biddingOpen ? '• Open' : '• Closed'}
                       </Typography>
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
                         <Typography variant="caption" color="text.secondary">{t.createdBy}</Typography>
@@ -242,7 +242,7 @@ export default function TradesPage({ session }) {
                     <TableCell>{t.tradeId}</TableCell>
                     <TableCell>{getModeLabel(t.mode)}</TableCell>
                     <TableCell>{t.currentRound}</TableCell>
-                    <TableCell>{t.tradeClosed ? 'Finalized' : t.biddingOpen ? 'Open' : 'Closed'}</TableCell>
+                    <TableCell>{t.cancelled ? 'Cancelled' : t.tradeClosed ? 'Finalized' : t.biddingOpen ? 'Open' : 'Closed'}</TableCell>
                     <TableCell sx={{ maxWidth: 400, wordBreak: 'break-word' }}>{t.description}</TableCell>
                     <TableCell>{t.createdBy}</TableCell>
                     <TableCell>

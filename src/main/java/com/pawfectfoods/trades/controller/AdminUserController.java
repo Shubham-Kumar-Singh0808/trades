@@ -5,6 +5,7 @@ import com.pawfectfoods.trades.dto.UpdateUserRequest;
 import com.pawfectfoods.trades.dto.UpdateRolesRequest;
 import com.pawfectfoods.trades.dto.UpdateUserStatusRequest;
 import com.pawfectfoods.trades.dto.UserResponse;
+import com.pawfectfoods.trades.model.RoleName;
 import com.pawfectfoods.trades.service.AdminUserService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
@@ -65,7 +67,8 @@ public class AdminUserController {
 
     @GetMapping
     public ResponseEntity<Page<UserResponse>> getUsers(
+            @RequestParam(value = "excludeRole", required = false) RoleName excludeRole,
             @PageableDefault(sort = "email") Pageable pageable) {
-        return ResponseEntity.ok(adminUserService.getAllUsers(pageable));
+        return ResponseEntity.ok(adminUserService.getAllUsers(pageable, excludeRole));
     }
 }

@@ -1,5 +1,15 @@
 # Changes Log
 
+## 2026-07-14 - Date Format Standardization: dd/MM/yyyy everywhere
+
+### Backend (EmailService.java)
+- Added imports: `ZoneId`, `ZonedDateTime`, `DateTimeFormatter`.
+- `sendTemporaryCredentialsEmail`: replaced raw `expiresAt.toString() + " UTC"` with `dd/MM/yyyy` formatted date in `Asia/Kolkata` timezone.
+
+### Frontend (TradeDetailsPage.jsx)
+- Added `formatDate(iso)` helper: uses `new Date(iso).toLocaleDateString('en-GB')` → produces `dd/mm/yyyy`.
+- Applied to: `trade.createdAt` (trade info card), `entry.submittedAt` (bid entries mobile card + desktop table).
+
 ## 2026-05-15 - Feature Batch: Comment Formatting, Email Restrictions, Vendor Management, SEA Total
 
 ### Feature 1: Comment Formatting (frontend)
