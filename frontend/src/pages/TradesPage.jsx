@@ -46,6 +46,8 @@ export default function TradesPage({ session }) {
   const [modeFilter, setModeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
+  const [fullDescription, setFullDescription] = useState('');
   const [form, setForm] = useState({
     tradeId: '',
     mode: 'AIR',
@@ -202,26 +204,68 @@ export default function TradesPage({ session }) {
 
           {isSm ? (
             <Stack spacing={1}>
-              {data?.content?.map((t) => (
-                <Card key={t.id} variant="outlined">
-                  <CardContent>
-                    <Stack spacing={1}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="subtitle1">{t.tradeId}</Typography>
-                        <Typography variant="caption" color="text.secondary">{getModeLabel(t.mode)}</Typography>
+              {data?.content?.map((t) => {
+                const maxLen = 80;
+                const isLong = t.description && (t.description.length > maxLen || t.description.includes('\n'));
+                return (
+                  <Card key={t.id} variant="outlined">
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="subtitle1">{t.tradeId}</Typography>
+                          <Typography variant="caption" color="text.secondary">{getModeLabel(t.mode)}</Typography>
+                        </Stack>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'pre-line',
+                            wordBreak: 'break-word',
+                            mb: isLong ? 0.5 : 0
+                          }}
+                        >
+                          {t.description}
+                        </Typography>
+                        {isLong && (
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setFullDescription(t.description);
+                              setDescriptionModalOpen(true);
+                            }}
+                            sx={{
+                              p: 0,
+                              minWidth: 0,
+                              alignSelf: 'flex-start',
+                              color: '#3a8a3a',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.8125rem',
+                              '&:hover': {
+                                backgroundColor: 'transparent',
+                                textDecoration: 'underline'
+                              }
+                            }}
+                          >
+                            Show More
+                          </Button>
+                        )}
+                        <Typography variant="body2" color="text.secondary">
+                          Round {t.currentRound} {t.cancelled ? '• Cancelled' : t.tradeClosed ? '• Finalized' : t.biddingOpen ? '• Open' : '• Closed'}
+                        </Typography>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="caption" color="text.secondary">{t.createdBy}</Typography>
+                          <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
+                        </Stack>
                       </Stack>
-                      <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{t.description}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Round {t.currentRound} {t.cancelled ? '• Cancelled' : t.tradeClosed ? '• Finalized' : t.biddingOpen ? '• Open' : '• Closed'}
-                      </Typography>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="caption" color="text.secondary">{t.createdBy}</Typography>
-                        <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
-                      </Stack>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </Stack>
           ) : (
             <Table size="small">
@@ -237,19 +281,61 @@ export default function TradesPage({ session }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data?.content?.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{t.tradeId}</TableCell>
-                    <TableCell>{getModeLabel(t.mode)}</TableCell>
-                    <TableCell>{t.currentRound}</TableCell>
-                    <TableCell>{t.cancelled ? 'Cancelled' : t.tradeClosed ? 'Finalized' : t.biddingOpen ? 'Open' : 'Closed'}</TableCell>
-                    <TableCell sx={{ maxWidth: 400, wordBreak: 'break-word' }}>{t.description}</TableCell>
-                    <TableCell>{t.createdBy}</TableCell>
-                    <TableCell>
-                      <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {data?.content?.map((t) => {
+                  const maxLen = 80;
+                  const isLong = t.description && (t.description.length > maxLen || t.description.includes('\n'));
+                  return (
+                    <TableRow key={t.id}>
+                      <TableCell>{t.tradeId}</TableCell>
+                      <TableCell>{getModeLabel(t.mode)}</TableCell>
+                      <TableCell>{t.currentRound}</TableCell>
+                      <TableCell>{t.cancelled ? 'Cancelled' : t.tradeClosed ? 'Finalized' : t.biddingOpen ? 'Open' : 'Closed'}</TableCell>
+                      <TableCell sx={{ maxWidth: 400, wordBreak: 'break-word' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'pre-line',
+                            mb: isLong ? 0.5 : 0
+                          }}
+                        >
+                          {t.description}
+                        </Typography>
+                        {isLong && (
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setFullDescription(t.description);
+                              setDescriptionModalOpen(true);
+                            }}
+                            sx={{
+                              p: 0,
+                              minWidth: 0,
+                              color: '#3a8a3a',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.8125rem',
+                              '&:hover': {
+                                backgroundColor: 'transparent',
+                                textDecoration: 'underline'
+                              }
+                            }}
+                          >
+                            Show More
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell>{t.createdBy}</TableCell>
+                      <TableCell>
+                        <Button component={Link} to={`/trades/${t.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600, '&:hover': { backgroundColor: 'rgba(58, 138, 58, 0.1)' } }}>Open</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -351,6 +437,49 @@ export default function TradesPage({ session }) {
         <DialogActions>
           <Button onClick={() => setCreateModalOpen(false)} sx={{ color: '#666' }}>Cancel</Button>
           <Button onClick={createTrade} variant="contained" sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' } }}>Create Trade</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Description Modal */}
+      <Dialog
+        open={descriptionModalOpen}
+        onClose={() => setDescriptionModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: '12px',
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>Full Description</DialogTitle>
+        <DialogContent sx={{ pb: 2 }}>
+          <Typography
+            variant="body1"
+            sx={{
+              whiteSpace: 'pre-line',
+              wordBreak: 'break-word',
+              color: 'text.primary',
+              lineHeight: 1.6
+            }}
+          >
+            {fullDescription}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setDescriptionModalOpen(false)}
+            variant="contained"
+            sx={{
+              backgroundColor: '#3a8a3a',
+              '&:hover': { backgroundColor: '#2d6b2d' },
+              borderRadius: '20px',
+              px: 3
+            }}
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </Stack>

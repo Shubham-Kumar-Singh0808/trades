@@ -283,7 +283,7 @@ export default function TradeDetailsPage({ session }) {
             <Stack spacing={1}>
               <Typography><strong>Trade ID:</strong> {trade.tradeId}</Typography>
               <Typography><strong>Mode:</strong> {getModeLabel(trade.mode)}</Typography>
-              <Typography><strong>Description:</strong> {trade.description}</Typography>
+              <Typography sx={{ whiteSpace: 'pre-line' }}><strong>Description:</strong> {trade.description}</Typography>
               <Typography><strong>Created By:</strong> {trade.createdBy}</Typography>
               <Typography><strong>Created At:</strong> {formatDate(trade.createdAt)}</Typography>
               <Typography><strong>Bidding Status:</strong> {trade.cancelled ? 'CANCELLED' : trade.biddingOpen ? 'OPEN' : 'CLOSED'}</Typography>
@@ -703,10 +703,17 @@ export default function TradeDetailsPage({ session }) {
           <Typography variant="body2" sx={{ mb: 2 }} color="text.secondary">
             Review the current leaderboard and confirm your selected freight forwarder. This action will close the tender and notify the selected vendor.
           </Typography>
+
+          {trade?.currentRound >= 2 && (
+            <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 2, mb: 1, color: '#3a8a3a' }}>
+              Round 2 Leaderboard (Current Round)
+            </Typography>
+          )}
+
           {(bidBoard?.leaderboard || []).length === 0 ? (
-            <Typography color="error">No bids available to finalize.</Typography>
+            <Typography color="error" sx={{ mb: 3 }}>No bids available to finalize.</Typography>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={{ mb: 4 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Rank</TableCell>
@@ -750,6 +757,50 @@ export default function TradeDetailsPage({ session }) {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {trade?.currentRound >= 2 && (
+            <>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 3, mb: 1, color: '#666' }}>
+                Round 1 Leaderboard (Reference)
+              </Typography>
+              {(bidBoard?.leaderboardRound1 || []).length === 0 ? (
+                <Typography color="text.secondary" sx={{ mb: 2 }}>No bids available for Round 1.</Typography>
+              ) : (
+                <Table size="small" sx={{ mb: 2 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Rank</TableCell>
+                      <TableCell>{trade?.mode === 'SEA' ? 'Ocean Freight (USD)' : 'Rate (INR)'}</TableCell>
+                      {trade?.mode === 'SEA' && <>
+                        <TableCell>IHC (INR)</TableCell>
+                        <TableCell>THC (INR)</TableCell>
+                        <TableCell>CFS (INR)</TableCell>
+                        <TableCell>Other Charges</TableCell>
+                      </>}
+                      <TableCell>Vendor</TableCell>
+                      <TableCell>Company</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {bidBoard.leaderboardRound1.map((item) => (
+                      <TableRow key={item.rank}>
+                        <TableCell><strong>{item.rank}</strong></TableCell>
+                        <TableCell>{formatRate(item.bidAmount, trade?.mode === 'SEA')}</TableCell>
+                        {trade?.mode === 'SEA' && <>
+                          <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
+                          <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
+                          <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
+                          <TableCell><LongTextCell text={item.otherChargesComments} /></TableCell>
+                        </>}
+                        <TableCell>{item.vendorName || '—'}</TableCell>
+                        <TableCell>{item.companyName || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </DialogContent>
         <DialogActions>

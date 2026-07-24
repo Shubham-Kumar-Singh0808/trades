@@ -86,7 +86,7 @@ public class TradeService {
             .jobSheetPdfPath(jobSheetPdfPath)
             .trackingListPdfPath(trackingListPdfPath)
             .createdAt(now)
-            .autoCloseAt(calculateAutoCloseAt(now))
+            .autoCloseAt(now.plus(java.time.Duration.ofHours(12)))
             .createdBy(createdBy)
             .biddingOpen(true)
             .currentRound(1)
@@ -125,6 +125,17 @@ public class TradeService {
         }
 
         Vendor vendor = resolveCurrentVendor();
+
+        if (trade.getCurrentRound() == 2) {
+            boolean participatedInRound1 = tradeBidRepository
+                .findByTrade_IdAndVendor_IdAndRoundNumber(tradeId, vendor.getId(), 1)
+                .isPresent();
+            if (!participatedInRound1) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.VENDOR_NOT_ELIGIBLE,
+                    "Only vendors who submitted a bid in Round 1 are allowed to bid in Round 2");
+            }
+        }
+
         Instant now = Instant.now();
 
         TradeBid bid = tradeBidRepository
@@ -195,6 +206,7 @@ public class TradeService {
             // ADMIN always sees vendor identity; EXECUTIVE always sees only rates
             boolean hideIdentity = !isAdmin;
             List<TradeBidRankResponse> leaderboard = buildLeaderboard(trade, hideIdentity);
+            List<TradeBidRankResponse> leaderboardRound1 = buildLeaderboard(trade, 1, hideIdentity);
             BigDecimal usdRate = trade.getMode() == TradeMode.SEA ? exchangeRateService.getUsdToInrRate() : null;
             List<TradeBidEntryResponse> entries = tradeBidRepository
                     .findByTrade_IdOrderByRoundNumberAscBidAmountAscUpdatedAtAsc(tradeId).stream()
@@ -208,6 +220,7 @@ public class TradeService {
                 trade.getFinalL1Rate(),
                 null,
                 leaderboard,
+                leaderboardRound1,
                 entries);
         }
 
@@ -248,6 +261,7 @@ public class TradeService {
             trade.getCurrentRound(),
             trade.getFinalL1Rate(),
             myCurrentBid,
+            List.of(),
             List.of(),
             myEntries);
     }
@@ -620,8 +634,12 @@ public class TradeService {
     }
 
     private List<TradeBidRankResponse> buildLeaderboard(Trade trade, boolean hideVendorIdentity) {
+        return buildLeaderboard(trade, trade.getCurrentRound(), hideVendorIdentity);
+    }
+
+    private List<TradeBidRankResponse> buildLeaderboard(Trade trade, int roundNumber, boolean hideVendorIdentity) {
         List<TradeBid> roundBids = tradeBidRepository
-            .findByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(trade.getId(), trade.getCurrentRound());
+            .findByTrade_IdAndRoundNumberOrderByBidAmountAscUpdatedAtAsc(trade.getId(), roundNumber);
 
         BigDecimal usdRate = trade.getMode() == TradeMode.SEA ? exchangeRateService.getUsdToInrRate() : null;
 

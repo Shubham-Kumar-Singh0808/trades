@@ -11,6 +11,7 @@ public record TradeBidBoardResponse(
         BigDecimal finalL1Rate,
         BigDecimal myCurrentBid,
         List<TradeBidRankResponse> leaderboard,
+        List<TradeBidRankResponse> leaderboardRound1,
         List<TradeBidEntryResponse> bidEntries
 ) {
 }

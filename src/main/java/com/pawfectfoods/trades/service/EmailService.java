@@ -319,7 +319,7 @@ public class EmailService {
                                         <p style=\"margin:0 0 16px;font-size:14px;line-height:1.7;\">Please contact the respective team for next steps.</p>
                                         <table role=\"presentation\" width=\"100%%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;margin:0 0 20px;\">
                                             <tr><td style=\"padding:10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;width:170px;\">Trade ID</td><td style=\"padding:10px;border:1px solid #e2e8f0;\">%s</td></tr>
-                                            <tr><td style=\"padding:10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;\">Description</td><td style=\"padding:10px;border:1px solid #e2e8f0;\">%s</td></tr>
+                                            <tr><td style=\"padding:10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;\">Description</td><td style=\"padding:10px;border:1px solid #e2e8f0;white-space:pre-line;\">%s</td></tr>
                                             <tr><td style=\"padding:10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;\">Winning Rate</td><td style=\"padding:10px;border:1px solid #e2e8f0;\">%s</td></tr>
                                         </table>
                                         <p style=\"margin:0 0 18px;\"><a href=\"%s\" style=\"display:inline-block;background:#166534;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;\">View Trade</a></p>
@@ -389,7 +389,7 @@ public class EmailService {
                                     <tr><td style=\"padding:26px 32px;background:linear-gradient(120deg,#0f172a,#1e293b);color:#fff;\"><h2 style=\"margin:0;font-size:24px;\">Tender Final Summary</h2></td></tr>
                                     <tr><td style=\"padding:28px 32px;color:#1f2937;\">
                                         <p style=\"margin:0 0 10px;font-size:15px;\"><strong>Trade ID:</strong> %s</p>
-                                        <p style=\"margin:0 0 18px;font-size:15px;\"><strong>Description:</strong> %s</p>
+                                        <p style=\"margin:0 0 18px;font-size:15px;white-space:pre-line;\"><strong>Description:</strong> %s</p>
                                         %s
                                     </td></tr>
                                 </table>
@@ -484,7 +484,7 @@ public class EmailService {
                                     <tr><td style="padding:28px 32px;color:#1f2937;">
                                         <p style="margin:0 0 12px;font-size:16px;">Dear Partner Vendor,</p>
                                         <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">A new Request for Quotation (RFQ) bearing Activity ID <strong>%s</strong> has been posted on the Pawfect Vendor Portal.</p>
-                                        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">Description: %s</p>
+                                        <p style="margin:0 0 14px;font-size:14px;line-height:1.7;white-space:pre-line;">Description: %s</p>
                                         <p style="margin:0 0 14px;font-size:14px;line-height:1.7;">Mode: %s</p>
                                         <p style="margin:0 0 18px;font-size:14px;line-height:1.7;">Please submit your quotation using the link below.</p>
                                         <p style="margin:0 0 20px;"><a href="%s" style="display:inline-block;background:#166534;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">Open RFQ</a></p>
@@ -633,7 +633,7 @@ public class EmailService {
                                                                     </tr>
                                                                     <tr>
                                                                         <td style=\"padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:600;\">Description</td>
-                                                                        <td style=\"padding:10px 12px;border:1px solid #e2e8f0;\">%s</td>
+                                                                        <td style=\"padding:10px 12px;border:1px solid #e2e8f0;white-space:pre-line;\">%s</td>
                                                                     </tr>
                                                                     <tr>
                                                                         <td style=\"padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:600;\">Mode</td>
