@@ -62,6 +62,95 @@ export default function TradesPage({ session }) {
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down('sm'));
 
+  const [stats, setStats] = useState(null);
+  const [reportMode, setReportMode] = useState('SEA');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reportData, setReportData] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+
+  const loadStats = async () => {
+    try {
+      const res = await api.get('/api/trades/stats');
+      setStats(res.data);
+    } catch (err) {
+      console.error("Failed to load stats", err);
+    }
+  };
+
+  const loadReport = async () => {
+    if (!startDate || !endDate) {
+      setReportError("Please select both start and end dates.");
+      return;
+    }
+    setReportError('');
+    setReportLoading(true);
+    try {
+      const startIso = new Date(startDate + "T00:00:00").toISOString();
+      const endIso = new Date(endDate + "T23:59:59").toISOString();
+      const res = await api.get('/api/trades/report', {
+        params: {
+          mode: reportMode,
+          startDate: startIso,
+          endDate: endIso
+        }
+      });
+      setReportData(res.data);
+    } catch (err) {
+      setReportError(err?.response?.data?.message || 'Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const downloadReportExcel = () => {
+    if (!reportData || reportData.length === 0) return;
+
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return "";
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    let csvContent = "";
+    csvContent += `Trade Report - ${reportMode} (${startDate} to ${endDate})\n\n`;
+
+    const headers = [
+      "Trade ID", "Mode", "Created At", "Closed At", "Status", "Weight", "Final Rate", "Winner", "Company", "Total Amount (INR)", "Description"
+    ];
+    csvContent += headers.join(",") + "\n";
+
+    reportData.forEach(item => {
+      const row = [
+        item.tradeId,
+        item.mode,
+        item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB') : "",
+        item.closedAt ? new Date(item.closedAt).toLocaleDateString('en-GB') : "",
+        item.status,
+        escapeCSV(item.weight),
+        item.finalL1Rate || "",
+        escapeCSV(item.winnerVendorName || ""),
+        escapeCSV(item.winnerCompanyName || ""),
+        item.totalAmount || "",
+        escapeCSV(item.description)
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Trade_Report_${reportMode}_${startDate}_to_${endDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const loadTrades = async (targetPage = page, filters = {}) => {
     setError('');
     try {
@@ -101,6 +190,7 @@ export default function TradesPage({ session }) {
     loadTrades(1);
     if (canCreateTrade) {
       loadVendors();
+      loadStats();
     }
   }, [canCreateTrade]);
 
@@ -151,6 +241,133 @@ export default function TradesPage({ session }) {
     <Stack spacing={3}>
       <Typography variant="h5">Trades</Typography>
       {error && <Alert severity="error">{error}</Alert>}
+
+      {canCreateTrade && stats && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 1 }}>
+          <Card sx={{ backgroundColor: 'rgba(58, 138, 58, 0.04)', border: '1px solid rgba(58, 138, 58, 0.12)' }}>
+            <CardContent>
+              <Typography color="text.secondary" variant="subtitle2" sx={{ fontWeight: 600 }}>Total Trades</Typography>
+              <Typography variant="h4" color="primary" sx={{ fontWeight: 700, mt: 1 }}>{stats.totalTrades}</Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ backgroundColor: 'rgba(21, 101, 192, 0.04)', border: '1px solid rgba(21, 101, 192, 0.12)' }}>
+            <CardContent>
+              <Typography color="text.secondary" variant="subtitle2" sx={{ fontWeight: 600 }}>Air Trades</Typography>
+              <Typography variant="h4" sx={{ color: '#1565c0', fontWeight: 700, mt: 1 }}>{stats.airTrades}</Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ backgroundColor: 'rgba(2, 136, 209, 0.04)', border: '1px solid rgba(2, 136, 209, 0.12)' }}>
+            <CardContent>
+              <Typography color="text.secondary" variant="subtitle2" sx={{ fontWeight: 600 }}>Sea Trades</Typography>
+              <Typography variant="h4" sx={{ color: '#0288d1', fontWeight: 700, mt: 1 }}>{stats.seaTrades}</Typography>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {canCreateTrade && (
+        <Card sx={{ mb: 1 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ color: '#3a8a3a', fontWeight: 600, mb: 2 }}>Trade Report Generator</Typography>
+            
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" sx={{ mb: 2 }}>
+              <FormControl sx={{ minWidth: 150 }} fullWidth>
+                <InputLabel>Report Mode</InputLabel>
+                <Select value={reportMode} label="Report Mode" onChange={(e) => setReportMode(e.target.value)}>
+                  <MenuItem value="AIR">Air</MenuItem>
+                  <MenuItem value="SEA">Sea</MenuItem>
+                </Select>
+              </FormControl>
+              
+              <TextField
+                label="Start Date"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                fullWidth
+              />
+              
+              <TextField
+                label="End Date"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                fullWidth
+              />
+              
+              <Button
+                variant="contained"
+                onClick={loadReport}
+                disabled={reportLoading}
+                sx={{ backgroundColor: '#3a8a3a', '&:hover': { backgroundColor: '#2d6b2d' }, minWidth: 150, height: 56 }}
+                fullWidth
+              >
+                Generate Report
+              </Button>
+            </Stack>
+
+            {reportError && <Alert severity="error" sx={{ mb: 2 }}>{reportError}</Alert>}
+
+            {reportData && reportData.length > 0 ? (
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3, mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={600}>Report Results ({reportData.length} records)</Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={downloadReportExcel}
+                    sx={{ color: '#2e7d32', borderColor: '#2e7d32', '&:hover': { borderColor: '#1b5e20', backgroundColor: 'rgba(46, 125, 50, 0.04)' } }}
+                  >
+                    Download Report (Excel)
+                  </Button>
+                </Box>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Trade ID</TableCell>
+                      <TableCell>Created At</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Weight</TableCell>
+                      <TableCell>Final Rate</TableCell>
+                      <TableCell>Winner Vendor</TableCell>
+                      <TableCell>Company</TableCell>
+                      <TableCell>Total Amount (INR)</TableCell>
+                      <TableCell>Details</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {reportData.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell><strong>{item.tradeId}</strong></TableCell>
+                        <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB') : '—'}</TableCell>
+                        <TableCell>{item.status}</TableCell>
+                        <TableCell>{item.weight || '—'}</TableCell>
+                        <TableCell>
+                          {item.finalL1Rate != null 
+                            ? (reportMode === 'SEA' ? `$${item.finalL1Rate}` : `Rs. ${item.finalL1Rate}`) 
+                            : '—'}
+                        </TableCell>
+                        <TableCell>{item.winnerVendorName || '—'}</TableCell>
+                        <TableCell>{item.winnerCompanyName || '—'}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: '#1565c0' }}>
+                          {item.totalAmount != null ? `₹${Number(item.totalAmount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Button component={Link} to={`/trades/${item.id}`} size="small" sx={{ color: '#3a8a3a', fontWeight: 600 }}>Open</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            ) : startDate && endDate && !reportLoading ? (
+              <Typography color="text.secondary" align="center" sx={{ my: 3 }}>No report records found for the selected filters.</Typography>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent>
@@ -371,6 +588,11 @@ export default function TradesPage({ session }) {
               label="Description"
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.stopPropagation();
+                }
+              }}
               multiline
               minRows={2}
               fullWidth

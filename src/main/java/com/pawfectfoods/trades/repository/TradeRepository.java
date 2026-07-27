@@ -14,6 +14,21 @@ import org.springframework.data.repository.query.Param;
 public interface TradeRepository extends JpaRepository<Trade, UUID> {
     boolean existsByTradeId(String tradeId);
 
+    long countByMode(TradeMode mode);
+
+    @Query("""
+            select t
+            from Trade t
+            where t.mode = :mode
+            and t.createdAt >= :startDate
+            and t.createdAt <= :endDate
+            order by t.createdAt desc
+            """)
+    java.util.List<Trade> findReportTrades(
+            @Param("mode") TradeMode mode,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate);
+
     java.util.List<Trade> findByCreatedBy(AppUser createdBy);
 
     java.util.List<Trade> findByBiddingOpenTrueAndClosedAtIsNullAndAutoCloseAtLessThanEqual(Instant autoCloseAt);

@@ -104,6 +104,173 @@ export default function TradeDetailsPage({ session }) {
     setBidBoard(bidBoardRes.data);
   };
 
+  const downloadExcel = () => {
+    if (!bidBoard) return;
+
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return "";
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const isSea = trade?.mode === 'SEA';
+    let csvContent = "";
+
+    // Round 2 Leaderboard Section
+    if (bidBoard.leaderboard && bidBoard.leaderboard.length > 0) {
+      if (trade?.currentRound >= 2) {
+        csvContent += "Round 2 L1 / L2 / L3 (Current Round)\n";
+      } else {
+        csvContent += "L1 / L2 / L3 Leaderboard\n";
+      }
+      const headers = isSea
+        ? ["Rank", "Ocean Freight (USD)", "IHC (INR)", "THC (INR)", "CFS (INR)", "Other Charges", "Total Est. (INR)", "Vendor", "Company"]
+        : ["Rank", "Rate (INR)", "Vendor", "Company"];
+      csvContent += headers.join(",") + "\n";
+
+      bidBoard.leaderboard.forEach(item => {
+        const row = isSea ? [
+          item.rank,
+          item.bidAmount || "",
+          item.ihcInr || "",
+          item.thcInr || "",
+          item.cfsInr || "",
+          escapeCSV(item.otherChargesComments),
+          item.totalInr || "",
+          escapeCSV(item.vendorName || "Hidden during bidding"),
+          escapeCSV(item.companyName || "Hidden during bidding")
+        ] : [
+          item.rank,
+          item.bidAmount || "",
+          escapeCSV(item.vendorName || "Hidden during bidding"),
+          escapeCSV(item.companyName || "Hidden during bidding")
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+      csvContent += "\n";
+    }
+
+    // Round 1 Leaderboard Section
+    if (trade?.currentRound >= 2 && bidBoard.leaderboardRound1 && bidBoard.leaderboardRound1.length > 0) {
+      csvContent += "Round 1 L1 / L2 / L3 (Reference)\n";
+      const headers = isSea
+        ? ["Rank", "Ocean Freight (USD)", "IHC (INR)", "THC (INR)", "CFS (INR)", "Other Charges", "Total Est. (INR)", "Vendor", "Company"]
+        : ["Rank", "Rate (INR)", "Vendor", "Company"];
+      csvContent += headers.join(",") + "\n";
+
+      bidBoard.leaderboardRound1.forEach(item => {
+        const row = isSea ? [
+          item.rank,
+          item.bidAmount || "",
+          item.ihcInr || "",
+          item.thcInr || "",
+          item.cfsInr || "",
+          escapeCSV(item.otherChargesComments),
+          item.totalInr || "",
+          escapeCSV(item.vendorName || ""),
+          escapeCSV(item.companyName || "")
+        ] : [
+          item.rank,
+          item.bidAmount || "",
+          escapeCSV(item.vendorName || ""),
+          escapeCSV(item.companyName || "")
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+    }
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${trade?.tradeId || 'trade-leaderboard'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const renderLeaderboard = (leaderboardData, title) => {
+    if (!leaderboardData || leaderboardData.length === 0) {
+      return (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#3a8a3a' }}>{title}</Typography>
+          <Typography color="text.secondary" variant="body2">No bids available.</Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#3a8a3a' }}>{title}</Typography>
+        {isSm ? (
+          <Stack spacing={1}>
+            {leaderboardData.map((item) => (
+              <Card key={item.rank} variant="outlined">
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle2">Rank {item.rank}</Typography>
+                    <Typography variant="body2">{formatRate(item.bidAmount, trade?.mode === 'SEA')}</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">{item.vendorName || 'Hidden during bidding'}</Typography>
+                  <Typography variant="body2" color="text.secondary">{item.companyName || 'Hidden during bidding'}</Typography>
+                  {trade?.mode === 'SEA' && item.totalInr != null && (
+                    <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                      Total est.: ₹{Number(item.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Rank</TableCell>
+                <TableCell>{trade?.mode === 'SEA' ? 'Ocean Freight (USD)' : 'Rate (INR)'}</TableCell>
+                {trade?.mode === 'SEA' && (
+                  <>
+                    <TableCell>IHC (INR)</TableCell>
+                    <TableCell>THC (INR)</TableCell>
+                    <TableCell>CFS (INR)</TableCell>
+                    <TableCell>Other Charges</TableCell>
+                    <TableCell>Total Est. (INR)</TableCell>
+                  </>
+                )}
+                <TableCell>Vendor</TableCell>
+                <TableCell>Company</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {leaderboardData.map((item) => (
+                <TableRow key={item.rank}>
+                  <TableCell><strong>{item.rank}</strong></TableCell>
+                  <TableCell>{formatRate(item.bidAmount, trade?.mode === 'SEA')}</TableCell>
+                  {trade?.mode === 'SEA' && (
+                    <>
+                      <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
+                      <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
+                      <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
+                      <TableCell><LongTextCell text={item.otherChargesComments} /></TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#1565c0' }}>
+                        {item.totalInr != null ? `₹${Number(item.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell>{item.vendorName || 'Hidden during bidding'}</TableCell>
+                  <TableCell>{item.companyName || 'Hidden during bidding'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Box>
+    );
+  };
+
   useEffect(() => {
     let createdJobSheetUrl = null;
     let createdTrackingListUrl = null;
@@ -381,58 +548,24 @@ export default function TradeDetailsPage({ session }) {
 
               {isAdminExecutive && (
                 <Box>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>L1 / L2 / L3</Typography>
-                  {isSm ? (
-                    <Stack spacing={1}>
-                      {(bidBoard.leaderboard || []).map((item) => (
-                        <Card key={item.rank} variant="outlined">
-                          <CardContent>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                              <Typography variant="subtitle2">Rank {item.rank}</Typography>
-                              <Typography variant="body2">{formatRate(item.bidAmount, trade?.mode === 'SEA')}</Typography>
-                            </Stack>
-                            <Typography variant="body2" color="text.secondary">{item.vendorName || 'Hidden during bidding'}</Typography>
-                            <Typography variant="body2" color="text.secondary">{item.companyName || 'Hidden during bidding'}</Typography>
-                            {trade?.mode === 'SEA' && item.totalInr != null && <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>Total est.: ₹{Number(item.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Typography>}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Stack>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" sx={{ color: '#3a8a3a', fontWeight: 600 }}>Leaderboards</Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={downloadExcel}
+                      sx={{ color: '#2e7d32', borderColor: '#2e7d32', '&:hover': { borderColor: '#1b5e20', backgroundColor: 'rgba(46, 125, 50, 0.04)' }, whiteSpace: 'nowrap' }}
+                    >
+                      Export to Excel
+                    </Button>
+                  </Box>
+                  {trade?.currentRound >= 2 ? (
+                    <>
+                      {renderLeaderboard(bidBoard.leaderboard, "Round 2 L1 / L2 / L3 (Current Round)")}
+                      {renderLeaderboard(bidBoard.leaderboardRound1, "Round 1 L1 / L2 / L3 (Reference)")}
+                    </>
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Rank</TableCell>
-                          <TableCell>{trade?.mode === 'SEA' ? 'Ocean Freight (USD)' : 'Rate (INR)'}</TableCell>
-                          {trade?.mode === 'SEA' && <>
-                            <TableCell>IHC (INR)</TableCell>
-                            <TableCell>THC (INR)</TableCell>
-                            <TableCell>CFS (INR)</TableCell>
-                            <TableCell>Other Charges</TableCell>
-                            <TableCell>Total Est. (INR)</TableCell>
-                          </>}
-                          <TableCell>Vendor</TableCell>
-                          <TableCell>Company</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {(bidBoard.leaderboard || []).map((item) => (
-                          <TableRow key={item.rank}>
-                            <TableCell>{item.rank}</TableCell>
-                            <TableCell>{formatRate(item.bidAmount, trade?.mode === 'SEA')}</TableCell>
-                            {trade?.mode === 'SEA' && <>
-                              <TableCell>{item.ihcInr != null ? `₹${item.ihcInr}` : '—'}</TableCell>
-                              <TableCell>{item.thcInr != null ? `₹${item.thcInr}` : '—'}</TableCell>
-                              <TableCell>{item.cfsInr != null ? `₹${item.cfsInr}` : '—'}</TableCell>
-                              <TableCell><LongTextCell text={item.otherChargesComments} /></TableCell>
-                              <TableCell sx={{ fontWeight: 600, color: '#1565c0' }}>{item.totalInr != null ? `₹${Number(item.totalInr).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}</TableCell>
-                            </>}
-                            <TableCell>{item.vendorName || 'Hidden during bidding'}</TableCell>
-                            <TableCell>{item.companyName || 'Hidden during bidding'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    renderLeaderboard(bidBoard.leaderboard, "L1 / L2 / L3")
                   )}
                 </Box>
               )}
@@ -780,6 +913,7 @@ export default function TradeDetailsPage({ session }) {
                       </>}
                       <TableCell>Vendor</TableCell>
                       <TableCell>Company</TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -795,6 +929,17 @@ export default function TradeDetailsPage({ session }) {
                         </>}
                         <TableCell>{item.vendorName || '—'}</TableCell>
                         <TableCell>{item.companyName || '—'}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => closeBid(item.bidId)}
+                            disabled={actionLoading}
+                            sx={{ backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' }, whiteSpace: 'nowrap' }}
+                          >
+                            Confirm as Winner
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

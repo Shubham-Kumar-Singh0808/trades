@@ -199,7 +199,7 @@ export default function VendorsPage({ session }) {
             <Stack spacing={1}>
               {data?.content?.map((v) => (
                 <Card key={v.id} variant="outlined" sx={{ p: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2">{v.name}</Typography>
                       <Typography variant="body2" color="text.secondary">{v.companyName}</Typography>
@@ -211,81 +211,68 @@ export default function VendorsPage({ session }) {
                       </Stack>
                     </Box>
                     <Box>
-                      <Stack spacing={0.5}>
-                        <Tooltip title="View Vendor Details" placement="left">
-                          <Button
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="View Vendor Details">
+                          <IconButton
                             size="small"
-                            variant="outlined"
-                            startIcon={<VisibilityIcon fontSize="small" />}
                             onClick={() => openContactDetails(v)}
                             sx={{
-                              borderColor: '#3a8a3a',
                               color: '#3a8a3a',
                               '&:hover': {
-                                borderColor: '#2d6b2d',
-                                color: '#2d6b2d',
-                                backgroundColor: 'rgba(58, 138, 58, 0.04)'
+                                backgroundColor: 'rgba(58, 138, 58, 0.08)'
                               }
                             }}
                           >
-                            View
-                          </Button>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
                         </Tooltip>
                         {isAdmin && (
-                          <Tooltip title="Edit Vendor" placement="left">
-                            <Button
+                          <Tooltip title="Edit Vendor">
+                            <IconButton
                               size="small"
-                              variant="outlined"
                               color="primary"
-                              startIcon={<EditIcon fontSize="small" />}
                               disabled={actionLoading}
                               onClick={() => setEditingVendor({ ...v })}
                             >
-                              Edit
-                            </Button>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
                           </Tooltip>
                         )}
                         {isAdmin && (
                           v.active ? (
-                            <Tooltip title="Deactivate Vendor" placement="left">
-                              <Button
+                            <Tooltip title="Deactivate Vendor">
+                              <IconButton
                                 size="small"
-                                variant="outlined"
                                 color="warning"
-                                startIcon={<BlockIcon fontSize="small" />}
                                 disabled={actionLoading}
                                 onClick={() => handleDeactivateVendor(v.id)}
                               >
-                                Deactivate
-                              </Button>
+                                <BlockIcon fontSize="small" />
+                              </IconButton>
                             </Tooltip>
                           ) : (
-                            <Tooltip title="Activate Vendor" placement="left">
-                              <Button
+                            <Tooltip title="Activate Vendor">
+                              <IconButton
                                 size="small"
-                                variant="outlined"
                                 color="success"
-                                startIcon={<CheckCircleIcon fontSize="small" />}
                                 disabled={actionLoading}
                                 onClick={() => handleActivateVendor(v.id)}
                               >
-                                Activate
-                              </Button>
+                                <CheckCircleIcon fontSize="small" />
+                              </IconButton>
                             </Tooltip>
                           )
                         )}
                         {isAdmin && (
-                          <Tooltip title="Delete Vendor" placement="left">
-                            <Button
+                          <Tooltip title="Delete Vendor">
+                            <IconButton
                               size="small"
-                              variant="outlined"
                               color="error"
-                              startIcon={<DeleteIcon fontSize="small" />}
                               disabled={actionLoading}
                               onClick={() => setDeleteConfirmVendor(v)}
                             >
-                              Delete
-                            </Button>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
                           </Tooltip>
                         )}
                       </Stack>
@@ -324,81 +311,68 @@ export default function VendorsPage({ session }) {
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                      <Stack direction="row" spacing={0.5} flexWrap="nowrap" alignItems="center">
                         <Tooltip title="View Vendor Details">
-                          <Button
+                          <IconButton
                             size="small"
-                            variant="outlined"
-                            startIcon={<VisibilityIcon fontSize="small" />}
                             onClick={() => openContactDetails(v)}
                             sx={{
-                              borderColor: '#3a8a3a',
                               color: '#3a8a3a',
                               '&:hover': {
-                                borderColor: '#2d6b2d',
-                                color: '#2d6b2d',
-                                backgroundColor: 'rgba(58, 138, 58, 0.04)'
+                                backgroundColor: 'rgba(58, 138, 58, 0.08)'
                               }
                             }}
                           >
-                            View Details
-                          </Button>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
                         </Tooltip>
                         {isAdmin && (
                           <Tooltip title="Edit Vendor">
-                            <Button
+                            <IconButton
                               size="small"
-                              variant="outlined"
                               color="primary"
-                              startIcon={<EditIcon fontSize="small" />}
                               disabled={actionLoading}
                               onClick={() => setEditingVendor({ ...v })}
                             >
-                              Edit
-                            </Button>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
                           </Tooltip>
                         )}
                         {isAdmin && (
                           v.active ? (
                             <Tooltip title="Deactivate Vendor">
-                              <Button
+                              <IconButton
                                 size="small"
-                                variant="outlined"
                                 color="warning"
-                                startIcon={<BlockIcon fontSize="small" />}
                                 disabled={actionLoading}
                                 onClick={() => handleDeactivateVendor(v.id)}
                               >
-                                Deactivate
-                              </Button>
+                                <BlockIcon fontSize="small" />
+                              </IconButton>
                             </Tooltip>
                           ) : (
                             <Tooltip title="Activate Vendor">
-                              <Button
+                              <IconButton
                                 size="small"
-                                variant="outlined"
                                 color="success"
-                                startIcon={<CheckCircleIcon fontSize="small" />}
                                 disabled={actionLoading}
                                 onClick={() => handleActivateVendor(v.id)}
                               >
-                                Activate
-                              </Button>
+                                <CheckCircleIcon fontSize="small" />
+                              </IconButton>
                             </Tooltip>
                           )
                         )}
                         {isAdmin && (
                           <Tooltip title="Delete Vendor">
-                            <Button
+                            <IconButton
                               size="small"
-                              variant="outlined"
                               color="error"
-                              startIcon={<DeleteIcon fontSize="small" />}
                               disabled={actionLoading}
                               onClick={() => setDeleteConfirmVendor(v)}
                             >
-                              Delete
-                            </Button>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
                           </Tooltip>
                         )}
                       </Stack>

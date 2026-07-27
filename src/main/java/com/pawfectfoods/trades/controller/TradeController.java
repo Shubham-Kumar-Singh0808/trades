@@ -7,6 +7,10 @@ import com.pawfectfoods.trades.dto.MessageResponse;
 import com.pawfectfoods.trades.dto.TradeBidBoardResponse;
 import com.pawfectfoods.trades.dto.TradeBidRankResponse;
 import com.pawfectfoods.trades.dto.TradeResponse;
+import com.pawfectfoods.trades.dto.TradeStatsResponse;
+import com.pawfectfoods.trades.dto.TradeReportResponse;
+import com.pawfectfoods.trades.model.TradeMode;
+import java.time.Instant;
 import com.pawfectfoods.trades.service.TradeService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -183,4 +187,22 @@ public class TradeController {
                 ContentDisposition.attachment().filename("trade-" + id + "-packing-list.pdf").build().toString())
             .body(bytes);
         }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
+    public ResponseEntity<TradeStatsResponse> getTradeStats() {
+        return ResponseEntity.ok(tradeService.getTradeStats());
+    }
+
+    @GetMapping("/report")
+    @PreAuthorize("hasAnyRole('ADMIN','EXECUTIVE')")
+    public ResponseEntity<List<TradeReportResponse>> getTradeReport(
+            @RequestParam("mode") String mode,
+            @RequestParam("startDate") String startDate,
+            @RequestParam("endDate") String endDate) {
+        TradeMode tradeMode = com.pawfectfoods.trades.model.TradeMode.valueOf(mode.toUpperCase());
+        Instant start = Instant.parse(startDate);
+        Instant end = Instant.parse(endDate);
+        return ResponseEntity.ok(tradeService.getTradeReport(tradeMode, start, end));
+    }
 }

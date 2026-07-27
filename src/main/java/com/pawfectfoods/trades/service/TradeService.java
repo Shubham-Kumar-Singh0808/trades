@@ -8,6 +8,8 @@ import com.pawfectfoods.trades.dto.TradeBidEntryResponse;
 import com.pawfectfoods.trades.dto.TradeBidRankResponse;
 import com.pawfectfoods.trades.dto.TradeNotificationScope;
 import com.pawfectfoods.trades.dto.TradeResponse;
+import com.pawfectfoods.trades.dto.TradeStatsResponse;
+import com.pawfectfoods.trades.dto.TradeReportResponse;
 import com.pawfectfoods.trades.error.BusinessException;
 import com.pawfectfoods.trades.error.ErrorCode;
 import com.pawfectfoods.trades.model.AppUser;
@@ -306,9 +308,9 @@ public class TradeService {
                 "Selected bid does not belong to this trade");
         }
 
-        if (winningBid.getRoundNumber() != trade.getCurrentRound()) {
+        if (winningBid.getRoundNumber() > trade.getCurrentRound()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ErrorCode.TRADE_BID_NOT_FOUND,
-                "Selected bid is not from the current round");
+                "Selected bid is not from a valid round");
         }
 
         trade.setClosedAt(Instant.now());
@@ -792,5 +794,74 @@ public class TradeService {
             case AIR -> "Air";
             case SEA -> "Sea";
         };
+    }
+
+    @Transactional(readOnly = true)
+    public TradeStatsResponse getTradeStats() {
+        long total = tradeRepository.count();
+        long air = tradeRepository.countByMode(TradeMode.AIR);
+        long sea = tradeRepository.countByMode(TradeMode.SEA);
+        return new TradeStatsResponse(total, air, sea);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TradeReportResponse> getTradeReport(TradeMode mode, Instant start, Instant end) {
+        List<Trade> trades = tradeRepository.findReportTrades(mode, start, end);
+        BigDecimal usdRate = mode == TradeMode.SEA ? exchangeRateService.getUsdToInrRate() : null;
+
+        List<TradeReportResponse> report = new ArrayList<>();
+        for (Trade t : trades) {
+            String status = t.isCancelled() ? "CANCELLED" : t.getClosedAt() != null ? "FINALIZED" : t.isBiddingOpen() ? "OPEN" : "ROUND_CLOSED";
+            
+            String winnerVendorName = null;
+            String winnerCompanyName = null;
+            BigDecimal totalAmount = null;
+
+            if (t.getClosedAt() != null && t.getFinalL1Rate() != null) {
+                List<TradeBid> bids = tradeBidRepository.findByTrade_IdOrderByRoundNumberAscBidAmountAscUpdatedAtAsc(t.getId());
+                TradeBid winningBid = bids.stream()
+                    .filter(bid -> bid.getBidAmount() != null && bid.getBidAmount().compareTo(t.getFinalL1Rate()) == 0)
+                    .findFirst()
+                    .orElse(null);
+
+                if (winningBid != null) {
+                    winnerVendorName = winningBid.getVendor().getName();
+                    winnerCompanyName = winningBid.getVendor().getCompanyName();
+                    if (t.getMode() == TradeMode.SEA) {
+                        totalAmount = computeSeaTotal(winningBid, usdRate);
+                    } else {
+                        totalAmount = winningBid.getBidAmount();
+                    }
+                }
+            }
+
+            String weight = extractWeight(t.getDescription());
+
+            report.add(new TradeReportResponse(
+                t.getId(),
+                t.getTradeId(),
+                t.getMode().name(),
+                t.getCreatedAt(),
+                t.getClosedAt(),
+                status,
+                t.getDescription(),
+                t.getFinalL1Rate(),
+                winnerVendorName,
+                winnerCompanyName,
+                totalAmount,
+                weight
+            ));
+        }
+        return report;
+    }
+
+    private String extractWeight(String description) {
+        if (description == null) return "";
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(?i)(\\d+(?:\\.\\d+)?)\\s*(kg|kgs|ton|tons|ctr|ctrs|container|containers)");
+        java.util.regex.Matcher matcher = pattern.matcher(description);
+        if (matcher.find()) {
+            return matcher.group(1) + " " + matcher.group(2);
+        }
+        return "N/A";
     }
 }
